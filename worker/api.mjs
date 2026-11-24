@@ -1,0 +1,83 @@
+const prefix = "programs/";
+const parts = ["교원파트", "학습파트", "원격파트"];
+const leads = ["학과주도", "부서주도", "기타"];
+const textLimits = { name: 100, fund: 60, unit: 20, owner: 80, org: 80 };
+const maxNumbers = { budget: 999999999999, spent: 999999999999, target: 999999999, actual: 999999999 };
+const required = ["name", "fund", "unit", "owner"];
+
+function json(data, status = 200) {
+  return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
+}
+
+function validate(record) {
+  if (!record || !parts.includes(record.part) || !leads.includes(record.lead) ||
+      !Number.isInteger(record.year) || record.year < 1900 || record.year > 9999) return false;
+  return Object.entries(textLimits).every(([field, max]) =>
+    typeof record[field] === "string" && record[field].trim().length <= max &&
+    (!required.includes(field) || record[field].trim().length > 0)) &&
+    Object.entries(maxNumbers).every(([field, max]) =>
+      Number.isFinite(record[field]) && record[field] >= 0 && record[field] <= max) &&
+    Number.isInteger(record.budget) && Number.isInteger(record.spent);
+}
+
+export async function api(request, env, path) {
+  const userId = request.headers.get("oai-authenticated-user-id");
+  if (!userId) return json({ error: "ChatGPT 계정으로 로그인하세요." }, 401);
+
+  if (path === "/api/programs" && request.method === "GET") {
+    const programs = [];
+    let cursor;
+    do {
+      const page = await env.BUCKET.list({ prefix, cursor, limit: 100, include: ["customMetadata"] });
+      const active = page.objects.filter(object => object.customMetadata?.deleted !== "1");
+      for (let offset = 0; offset < active.length; offset += 20) {
+        const objects = await Promise.all(active.slice(offset, offset + 20).map(object => env.BUCKET.get(object.key)));
+        for (const object of objects) {
+          if (object && object.customMetadata?.deleted !== "1") programs.push({ ...await object.json(), version: object.etag });
+        }
+      }
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+    const encoded = request.headers.get("oai-authenticated-user-full-name");
+    let name = request.headers.get("oai-authenticated-user-email") || "";
+    if (encoded) {
+      try {
+        name = request.headers.get("oai-authenticated-user-full-name-encoding") === "percent-encoded-utf-8"
+          ? decodeURIComponent(encoded) : encoded;
+      } catch {}
+    }
+    return json({ programs, name });
+  }
+
+  const match = /^\/api\/programs\/([a-z0-9-]{1,80})$/.exec(path);
+  if (!match || !["PUT", "DELETE"].includes(request.method)) return json({ error: "요청을 찾을 수 없습니다." }, 404);
+  const id = match[1];
+  const version = request.headers.get("If-Match");
+  const creating = request.headers.get("If-None-Match") === "*";
+  if ((!creating && !/^[a-f0-9]{32}$/.test(version || "")) || (creating && request.method === "DELETE")) {
+    return json({ error: "프로그램 버전이 필요합니다." }, 400);
+  }
+  const key = prefix + id;
+  const current = creating ? null : await env.BUCKET.head(key);
+  if (!creating && (!current || current.customMetadata?.deleted === "1" || current.etag !== version)) {
+    return json({ error: "다른 담당자가 이 프로그램을 변경했습니다. 화면을 새로고침한 뒤 다시 시도하세요." }, 409);
+  }
+  let record;
+  const deleted = request.method === "DELETE";
+  if (!deleted) {
+    const body = await request.text();
+    if (body.length > 6000) return json({ error: "입력 내용이 너무 깁니다." }, 413);
+    let input;
+    try { input = JSON.parse(body); } catch { return json({ error: "입력 형식이 올바르지 않습니다." }, 400); }
+    if (!validate(input)) return json({ error: "파트, 운영 유형, 담당자와 프로그램 항목을 확인하세요." }, 400);
+    record = { id, part: input.part, lead: input.lead, year: input.year, updatedAt: new Date().toISOString() };
+    for (const field of Object.keys(textLimits)) record[field] = input[field].trim();
+    for (const field of Object.keys(maxNumbers)) record[field] = input[field];
+  }
+  const stored = await env.BUCKET.put(key, JSON.stringify(record ?? { id }), {
+    onlyIf: creating ? { etagDoesNotMatch: "*" } : { etagMatches: version },
+    customMetadata: { deleted: deleted ? "1" : "0" }
+  });
+  if (!stored) return json({ error: "다른 담당자가 이 프로그램을 변경했습니다. 화면을 새로고침한 뒤 다시 시도하세요." }, 409);
+  return json(deleted ? { id } : { ...record, version: stored.etag });
+}
