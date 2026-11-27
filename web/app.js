@@ -252,9 +252,10 @@ function setView(next) {
 function updateOrganizationField() {
   const form = $("form");
   const lead = form.elements.lead.value;
-  $("orgLabel").textContent = lead === "학과주도" ? "주관 학과명" :
-    lead === "부서주도" ? "주관 부서명" : "주관 학과·부서명";
-  form.elements.org.required = lead === "학과주도";
+  const beforeDepartmentSelection = lead === "학과주도";
+  $("orgField").hidden = beforeDepartmentSelection;
+  form.elements.org.disabled = beforeDepartmentSelection;
+  $("orgLabel").textContent = lead === "부서주도" ? "주관 부서명" : "주관 학과·부서명";
 }
 function addTeacher(teacher = { name: "", type: "" }) {
   const row = $("teacherTemplate").content.firstElementChild.cloneNode(true);
@@ -403,10 +404,7 @@ $("form").addEventListener("submit", async event => {
     return;
   }
   p.spent = shared ? Number(p.spent) : editing?.spent ?? 0;
-  if (p.lead === "학과주도" && !p.org) {
-    setFormError("주관 학과명을 입력하세요.");
-    return;
-  }
+  if (p.lead === "학과주도") p.org = editing?.lead === "학과주도" ? (editing.org ?? "") : "";
   for (const field of operationFields) p[field] = p[field] === "" ? null : Number(p[field]);
   p.priorActual = p.priorActual === "" ? null : Number(p.priorActual);
   p.extraIndicators = [...$("extraIndicators").children].map(row => {

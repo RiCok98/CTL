@@ -102,7 +102,6 @@ export async function api(request, env, path) {
     let input;
     try { input = JSON.parse(body); } catch { return json({ error: "입력 형식이 올바르지 않습니다." }, 400); }
     if (!validate(input)) return json({ error: "파트, 운영 유형, 담당자와 프로그램 항목을 확인하세요." }, 400);
-    if (input.lead === "학과주도" && !input.org.trim()) return json({ error: "주관 학과명을 입력하세요." }, 400);
     record = { id, part: input.part, lead: input.lead, year: input.year, updatedAt: new Date().toISOString() };
     for (const field of Object.keys(textLimits)) record[field] = input[field].trim();
     for (const field of Object.keys(maxNumbers)) record[field] = input[field];
