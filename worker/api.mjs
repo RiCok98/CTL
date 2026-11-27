@@ -5,7 +5,7 @@ const textLimits = { name: 100, fund: 60, unit: 20, owner: 80, org: 80 };
 const maxNumbers = { budget: 999999999999, spent: 999999999999, target: 999999999, actual: 999999999 };
 const counts = ["applicants", "completions"];
 const hours = ["requestedHours", "operatingHours"];
-const teacherTypes = ["산학전담", "강의전담", "교육전담", "일반전임교원"];
+const teacherTypes = ["산학전담", "강의전담", "교육전담", "일반전임교원", "직원"];
 const required = ["name", "fund", "unit", "owner"];
 
 function json(data, status = 200) {
@@ -19,7 +19,8 @@ function validateOperations(record) {
       (Number.isFinite(record[field]) && record[field] >= 0 && record[field] <= 999999)) &&
     (record.teachers === undefined || (Array.isArray(record.teachers) && record.teachers.length <= 30 &&
       record.teachers.every(teacher => teacher && typeof teacher.name === "string" &&
-        teacher.name.trim().length > 0 && teacher.name.trim().length <= 80 && teacherTypes.includes(teacher.type))));
+        teacher.name.trim().length > 0 && teacher.name.trim().length <= 80 && teacherTypes.includes(teacher.type) &&
+        (teacher.affiliation === undefined || (typeof teacher.affiliation === "string" && teacher.affiliation.trim().length <= 80)))));
 }
 function validate(record) {
   if (!record || !parts.includes(record.part) || !leads.includes(record.lead) ||
@@ -78,7 +79,7 @@ export async function api(request, env, path) {
   const deleted = request.method === "DELETE";
   if (!deleted) {
     const body = await request.text();
-    if (body.length > 6000) return json({ error: "입력 내용이 너무 깁니다." }, 413);
+    if (body.length > 12000) return json({ error: "입력 내용이 너무 깁니다." }, 413);
     let input;
     try { input = JSON.parse(body); } catch { return json({ error: "입력 형식이 올바르지 않습니다." }, 400); }
     if (!validate(input)) return json({ error: "파트, 운영 유형, 담당자와 프로그램 항목을 확인하세요." }, 400);
@@ -87,7 +88,7 @@ export async function api(request, env, path) {
     for (const field of Object.keys(textLimits)) record[field] = input[field].trim();
     for (const field of Object.keys(maxNumbers)) record[field] = input[field];
     for (const field of [...counts, ...hours]) record[field] = input[field] ?? null;
-    record.teachers = (input.teachers ?? []).map(({ name, type }) => ({ name: name.trim(), type }));
+    record.teachers = (input.teachers ?? []).map(({ name, type, affiliation }) => ({ name: name.trim(), type, affiliation: affiliation?.trim() ?? "" }));
   }
   const stored = await env.BUCKET.put(key, JSON.stringify(record ?? { id }), {
     onlyIf: creating ? { etagDoesNotMatch: "*" } : { etagMatches: version },

@@ -3,7 +3,8 @@ const $ = id => document.getElementById(id);
 const thisYear = Number(new Intl.DateTimeFormat("en", { year: "numeric", timeZone: "Asia/Seoul" }).format());
 const parts = ["교원파트", "학습파트", "원격파트"];
 const operationFields = ["applicants", "requestedHours", "completions", "operatingHours"];
-const teacherLabel = type => type === "일반전임교원" ? type : "전담전임교원 – " + type;
+const teacherLabel = type => ["일반전임교원", "직원"].includes(type) ? type : "전담전임교원 – " + type;
+const affiliationLabel = type => type === "직원" ? "소속 부서" : "소속 학과";
 const leads = ["학과주도", "부서주도", "기타"];
 const key = "ctl-programs-v1";
 const sample = [
@@ -122,7 +123,7 @@ function render() {
   ).join("") || '<p class="empty">목표 미달 프로그램이 없습니다.</p>';
   $("count").textContent = "· " + items.length + "개";
   $("rows").innerHTML = items.map(p =>
-    `<tr><td><button class="edit" type="button" data-edit="${esc(p.id)}">${esc(p.name)}</button><br><small class="hint">${p.year}${p.owner ? " · " + esc(p.owner) : ""}${p.local ? " · 로컬" : ""}</small></td><td>${esc(p.part || "미분류")}</td><td>${esc(p.lead || "미분류")}${p.org ? "<br><small class=hint>" + esc(p.org) + "</small>" : ""}</td><td>${esc(p.fund)}</td><td>${won(p.budget)}</td><td>${won(p.spent)}</td><td>${pct(p.spent,p.budget)}</td><td>${number(p.target)} / ${number(p.actual)} ${esc(p.unit)}</td><td>${pct(p.actual,p.target)}</td><td><span class="status ${status(p)}">${labels[status(p)]}</span></td><td class="hint">${operationDetails(p)}</td><td>${(p.teachers ?? []).map(t => esc(t.name) + " <small class=hint>(" + esc(teacherLabel(t.type)) + ")</small>").join("<br>") || "—"}</td></tr>`
+    `<tr><td><button class="edit" type="button" data-edit="${esc(p.id)}">${esc(p.name)}</button><br><small class="hint">${p.year}${p.owner ? " · " + esc(p.owner) : ""}${p.local ? " · 로컬" : ""}</small></td><td>${esc(p.part || "미분류")}</td><td>${esc(p.lead || "미분류")}${p.org ? "<br><small class=hint>" + esc(p.org) + "</small>" : ""}</td><td>${esc(p.fund)}</td><td>${won(p.budget)}</td><td>${won(p.spent)}</td><td>${pct(p.spent,p.budget)}</td><td>${number(p.target)} / ${number(p.actual)} ${esc(p.unit)}</td><td>${pct(p.actual,p.target)}</td><td><span class="status ${status(p)}">${labels[status(p)]}</span></td><td class="hint">${operationDetails(p)}</td><td>${(p.teachers ?? []).map(t => esc(t.name) + " <small class=hint>(" + esc(teacherLabel(t.type)) + (t.affiliation ? " · " + esc(t.affiliation) : "") + ")</small>").join("<br>") || "—"}</td></tr>`
   ).join("") || '<tr><td colspan="12">조건에 맞는 프로그램이 없습니다.</td></tr>';
   $("fundRows").innerHTML = groups(fundingPrograms()).map(g =>
     `<tr><td><button class="edit" data-fund="${esc(g.fund)}">${esc(g.fund)}</button></td><td>${g.items.length}개</td><td>${won(g.budget)}</td><td>${won(g.spent)}</td><td>${won(g.budget-g.spent)}</td><td>${pct(g.spent,g.budget)}</td><td>${g.reached} / ${g.tracked}개</td></tr>`
@@ -154,7 +155,14 @@ function updateOrganizationField() {
 function addTeacher(teacher = { name: "", type: "" }) {
   const row = $("teacherTemplate").content.firstElementChild.cloneNode(true);
   row.querySelector(".teacher-name").value = teacher.name;
-  row.querySelector(".teacher-type").value = teacher.type;
+  const type = row.querySelector(".teacher-type");
+  type.value = teacher.type;
+  row.querySelector(".teacher-affiliation").value = teacher.affiliation ?? "";
+  const updateAffiliationLabel = () => {
+    row.querySelector(".teacher-affiliation-label").textContent = affiliationLabel(type.value);
+  };
+  type.addEventListener("change", updateAffiliationLabel);
+  updateAffiliationLabel();
   row.querySelector(".teacher-remove").onclick = () => {
     row.remove();
     $("teacherAdd").disabled = false;
@@ -243,10 +251,11 @@ $("form").addEventListener("submit", async event => {
   for (const field of operationFields) p[field] = p[field] === "" ? null : Number(p[field]);
   p.teachers = [...$("teachers").children].map(row => ({
     name: row.querySelector(".teacher-name").value.trim(),
-    type: row.querySelector(".teacher-type").value
+    type: row.querySelector(".teacher-type").value,
+    affiliation: row.querySelector(".teacher-affiliation").value.trim()
   }));
   if (p.teachers.some(teacher => !teacher.name || !teacher.type)) {
-    setFormError("운영교원 이름과 유형을 입력하세요.");
+    setFormError("운영인력 이름과 유형을 입력하세요.");
     return;
   }
   p.id = editing?.id ?? crypto.randomUUID();
@@ -293,10 +302,10 @@ function csvCell(value) {
   return '"' + raw.replaceAll('"','""') + '"';
 }
 $("export").onclick = () => {
-  const rows = [["사업연도","프로그램","파트","운영 유형","주관 학과·부서명","재원","담당자","편성액","집행액","잔액","집행률","목표값","실적값","단위","달성률","상태","신청인원(명)","신청 운영시간(시간)","이수인원(명)","실제 운영시간(시간)","운영교원"]];
+  const rows = [["사업연도","프로그램","파트","운영 유형","주관 학과·부서명","재원","담당자","편성액","집행액","잔액","집행률","목표값","실적값","단위","달성률","상태","신청인원(명)","신청 운영시간(시간)","이수인원(명)","실제 운영시간(시간)","운영교원·직원"]];
   const items = view === "funding" ? fundingPrograms() : filteredPrograms();
   for (const p of items) rows.push([p.year,p.name,p.part,p.lead,p.org,p.fund,p.owner,p.budget,p.spent,p.budget-p.spent,pct(p.spent,p.budget),p.target,p.actual,p.unit,pct(p.actual,p.target),labels[status(p)],...operationFields.map(field => p[field] ?? ""),
-    (p.teachers ?? []).map(t => t.name + " (" + teacherLabel(t.type) + ")").join(" / ")]);
+    (p.teachers ?? []).map(t => t.name + " (" + teacherLabel(t.type) + (t.affiliation ? " · " + affiliationLabel(t.type) + " " + t.affiliation : "") + ")").join(" / ")]);
   const file = new Blob(["\uFEFF" + rows.map(row => row.map(csvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(file);
   const link = document.createElement("a");

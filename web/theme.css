@@ -83,7 +83,7 @@ dialog::backdrop { background: #102e2990; }
 .detail-section .fields { margin: 0; }
 .teacher-row {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   align-items: end;
   gap: 8px;
   margin-bottom: 10px;
