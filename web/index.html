@@ -7,24 +7,15 @@
 <section class="panel" id="fundPanel" hidden><div class="row"><h2>재원별 집계</h2><div class="filters"><select id="fundYear" aria-label="재원 집계 연도"></select><select id="fundPart" aria-label="재원 집계 파트"></select><select id="fundLead" aria-label="재원 집계 운영 유형"></select><select id="fundCompletion" aria-label="운영 완료 여부"><option value="">전체 완료 여부</option><option value="done">완료 (O)</option><option value="pending">미완료 (X)</option><option value="in_progress">운영중</option></select></div></div><div class="tablewrap"><table><thead><tr><th>재원</th><th>프로그램</th><th>편성액</th><th>집행액</th><th>잔액</th><th>집행률</th><th>목표 달성</th></tr></thead><tbody id="fundRows"></tbody></table></div></section>
 <section class="panel" id="programPanel"><div class="row"><h2>프로그램 현황 <span class="hint" id="count"></span></h2><div class="filters"><input type="search" id="query" placeholder="프로그램 검색" aria-label="프로그램 검색"><select id="year" aria-label="사업연도"></select><select id="fund" aria-label="재원"></select><select id="part" aria-label="파트"></select><select id="lead" aria-label="운영 유형"></select><select id="completionFilter" aria-label="운영 완료 여부"><option value="">전체 완료 여부</option><option value="done">완료 (O)</option><option value="pending">미완료 (X)</option><option value="in_progress">운영중</option></select><select id="statusFilter" aria-label="달성 상태"><option value="">전체 상태</option><option value="ok">달성</option><option value="pending">미달</option><option value="neutral">목표 미설정</option></select></div></div><div class="tablewrap"><table><thead><tr><th>프로그램</th><th>파트</th><th>운영 유형</th><th>재원</th><th>편성액</th><th>집행액</th><th>집행률</th><th>성과·자율지표</th><th>달성률</th><th>상태</th><th>운영 실적</th><th>운영교원·직원</th></tr></thead><tbody id="rows"></tbody></table></div></section>
 <section class="panel" id="operationPanel" hidden>
-<div class="row"><h2>운영 기록</h2><div class="filters"><select id="operationPart" aria-label="파트"></select><select id="operationProgram" aria-label="프로그램"></select></div></div>
+<div class="row"><h2>프로그램별 운영 요약</h2><div class="filters"><select id="operationYear" aria-label="사업연도"></select><select id="operationFund" aria-label="재원"></select><select id="operationLead" aria-label="운영 유형"></select><select id="operationPart" aria-label="파트"></select><select id="operationProgram" aria-label="프로그램"></select></div></div>
 <p id="operationNotice" class="hint" role="status"></p>
 <div id="operationTotals" class="row" style="margin-top:12px"></div><p id="operationOpening" class="hint"></p>
-<form id="operationForm" hidden>
-<div class="fields">
-<label>기록 유형<select id="operationKind" name="kind"><option value="expense">지출</option><option value="session">신청·운영 실적</option><option value="indicator">성과 달성값</option></select></label>
-<label>날짜<input name="date" type="date" required></label>
-<label class="wide"><span id="operationLabel">지출 항목</span><input name="label" maxlength="100" required></label>
-<label id="operationAmount">금액 (원)<input name="amount" type="number" min="1" max="999999999999" step="1" required></label>
-<label id="operationApplicants" hidden>신청인원 (명)<input name="applicants" type="number" min="0" max="999999999" step="1" disabled></label>
-<label id="operationRequested" hidden>신청 운영시간 (시간)<input name="requestedHours" type="number" min="0" max="999999" step="any" disabled></label>
-<label id="operationIndicatorField" hidden>성과지표<select id="operationIndicator" name="indicatorId" disabled required></select></label>
-<label id="operationActual" hidden>추가 달성값<input name="indicatorValue" inputmode="decimal" disabled required></label>
-<label id="operationPeople" hidden>이수인원 (연인원)<input name="people" type="number" min="0" max="999999999" step="1" disabled required></label>
-<label id="operationHours" hidden>이수·운영시간 (시간)<input name="hours" type="number" min="0" max="999999" step="any" disabled required></label>
-</div><button class="primary" type="submit">기록 추가</button>
-</form>
-<div class="tablewrap" style="margin-top:16px"><table><thead><tr><th>날짜</th><th>유형</th><th>항목·회차</th><th>지출액</th><th>이수인원</th><th>이수·운영시간</th><th>신청·성과 내역</th><th>관리</th></tr></thead><tbody id="operationRows"></tbody></table></div>
+<div class="tablewrap" style="margin-top:12px"><table>
+<thead><tr><th>프로그램</th><th>연도</th><th>재원</th><th>파트</th><th>운영 유형</th><th>편성액</th><th>누적 집행액</th><th>잔액</th><th>집행률</th><th>운영 실적</th><th>성과 달성률</th><th>운영 상태</th></tr></thead>
+<tbody id="operationSummary"></tbody></table></div>
+<div class="row" style="margin-top:20px"><h2>지출·실적 기록</h2></div>
+
+<div class="tablewrap" style="margin-top:16px"><table><thead><tr><th>프로그램</th><th>날짜</th><th>유형</th><th>항목·회차</th><th>학과·운영교수</th><th>지출액</th><th>이수인원</th><th>이수·운영시간</th><th>신청·성과 내역</th><th>관리</th></tr></thead><tbody id="operationRows"></tbody></table></div>
 </section>
 <div id="dashboardDetails">
 <section class="panel">
@@ -43,6 +34,28 @@
 <div><p><strong>iPhone · Safari</strong><br>공유 → 홈 화면에 추가</p><p><strong>Android · Chrome</strong><br>메뉴(⋮) → 홈 화면에 추가 또는 앱 설치</p></div>
 </div>
 </dialog>
+<dialog id="operationDialog" aria-labelledby="operationDialogTitle">
+<div class="row"><h2 id="operationDialogTitle">지출·실적 등록</h2><button class="secondary" type="button" id="operationClose" aria-label="닫기">✕</button></div>
+<form id="operationForm">
+<div class="fields">
+<label class="wide">프로그램<select id="operationEntryProgram" required></select></label>
+<label id="operationDepartment" class="wide" hidden>학과명<input name="department" maxlength="80" disabled></label>
+<label id="operationFaculty" hidden>운영교수<input name="faculty" maxlength="80" disabled></label>
+<label id="operationFacultyType" hidden>교원 유형<select name="facultyType" disabled>
+<option value="">선택</option><optgroup label="전담전임교원"><option>산학전담</option><option>강의전담</option><option>교육전담</option></optgroup><option>일반전임교원</option>
+</select></label>
+<label>기록 유형<select id="operationKind" name="kind"><option value="expense">지출</option><option value="session">신청·운영 실적</option><option value="indicator">성과 달성값</option></select></label>
+<label>날짜<input name="date" type="date" required></label>
+<label class="wide"><span id="operationLabel">지출 항목</span><input name="label" maxlength="100" required></label>
+<label id="operationAmount">금액 (원)<input name="amount" type="number" min="1" max="999999999999" step="1" required></label>
+<label id="operationApplicants" hidden>신청인원 (명)<input name="applicants" type="number" min="0" max="999999999" step="1" disabled></label>
+<label id="operationRequested" hidden>신청 운영시간 (시간)<input name="requestedHours" type="number" min="0" max="999999" step="any" disabled></label>
+<label id="operationIndicatorField" hidden>성과지표<select id="operationIndicator" name="indicatorId" disabled required></select></label>
+<label id="operationActual" hidden>추가 달성값<input name="indicatorValue" inputmode="decimal" disabled required></label>
+<label id="operationPeople" hidden>이수인원 (연인원)<input name="people" type="number" min="0" max="999999999" step="1" disabled required></label>
+<label id="operationHours" hidden>이수·운영시간 (시간)<input name="hours" type="number" min="0" max="999999" step="any" disabled required></label>
+</div><p id="operationError" class="notice" role="alert"></p><button class="primary" type="submit">기록 저장</button>
+</form></dialog>
 <dialog id="sheetsDialog" aria-labelledby="sheetsTitle">
 <form id="sheetsForm">
 <div class="row"><h2 id="sheetsTitle">공용 구글 스프레드시트</h2><button class="secondary" id="sheetsClose" type="button" aria-label="닫기">✕</button></div>

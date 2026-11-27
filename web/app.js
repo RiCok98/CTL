@@ -62,7 +62,6 @@ let accountName = "";
 let saving = false;
 let legacy = [];
 let view = "dashboard";
-let operationEntryOpen = false;
 let storageError = "";
 try {
   const stored = JSON.parse(localStorage.getItem(key));
@@ -235,7 +234,6 @@ function render() {
   ).join("") || '<tr><td colspan="7">등록된 프로그램이 없습니다.</td></tr>';
 }
 function setView(next) {
-  if (next !== "operations") operationEntryOpen = false;
   view = next;
   const heading = {
     dashboard: ["대시보드", "CTL 운영 대시보드", "재원별 프로그램의 예산 집행과 목표 달성 현황을 확인하세요."],
@@ -470,16 +468,7 @@ $("add").onclick = () => {
     return;
   }
   if (shared || window.ctlSheetActive) return;
-  if (!$("operationProgram").value) {
-    $("operationNotice").textContent = programs.length ?
-      "지출·실적을 기록할 프로그램을 먼저 선택하세요." :
-      "프로그램 관리에서 프로그램을 먼저 등록하세요.";
-    $("operationProgram").focus();
-    return;
-  }
-  operationEntryOpen = true;
-  renderOperations();
-  $("operationKind").focus();
+  openOperationEntry();
 };
 $("close").onclick = $("cancel").onclick = () => $("dialog").close();
 document.addEventListener("click", event => {
@@ -539,16 +528,14 @@ function downloadCsv(rows, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function operationCsvRows() {
-  const rows = [["사업연도", "파트", "프로그램", "날짜", "유형", "항목·회차", "지출액(원)", "이수인원(명)", "이수·운영시간(시간)", "신청인원(명)", "신청 운영시간(시간)", "성과지표", "단위", "추가 달성값"]];
-  const selectedPart = $("operationPart").value;
-  const selectedId = $("operationProgram").value;
-  for (const program of programs) {
-    if ((selectedPart && selectedPart !== program.part) || (selectedId && selectedId !== program.id)) continue;
+  const rows = [["사업연도", "파트", "프로그램", "날짜", "유형", "항목·회차", "지출액(원)", "이수인원(명)", "이수·운영시간(시간)", "신청인원(명)", "신청 운영시간(시간)", "성과지표", "단위", "추가 달성값", "학과명", "운영교수", "교원 유형"]];
+  for (const program of operatingPrograms()) {
     for (const record of programOperations(program.id)) {
       const expense = record.kind === "expense";
       rows.push([program.year, program.part, program.name, record.date, operationTypeLabel(record.kind),
         record.label, expense ? record.amount : "", record.people ?? "", record.hours ?? "",
-        record.applicants ?? "", record.requestedHours ?? "", record.indicatorName ?? "", record.unit ?? "", record.value ?? ""]);
+        record.applicants ?? "", record.requestedHours ?? "", record.indicatorName ?? "", record.unit ?? "", record.value ?? "",
+        record.department ?? "", record.faculty ?? "", record.facultyType ? teacherLabel(record.facultyType) : ""]);
     }
   }
   return rows;
@@ -582,53 +569,97 @@ async function initialize() {
 function showProgramOperations(program) {
   setView("operations");
   $("operationPart").value = parts.includes(program.part) ? program.part : "";
+  $("operationYear").value = "";
+  $("operationFund").value = "";
+  $("operationLead").value = "";
   renderOperations();
   $("operationProgram").value = program.id;
   renderOperations();
 }
+function operatingPrograms({ ignoreProgram = false } = {}) {
+  return programs.filter(program => (ignoreProgram || !$("operationProgram").value || program.id === $("operationProgram").value) &&
+    (!$("operationYear").value || String(program.year) === $("operationYear").value) &&
+    (!$("operationFund").value || program.fund === $("operationFund").value) &&
+    (!$("operationPart").value || program.part === $("operationPart").value) &&
+    (!$("operationLead").value || program.lead === $("operationLead").value));
+}
+const programOption = program => new Option(program.name + " · " + (program.year || "—") + " · " + (program.part || "미분류"), program.id);
 function renderOperations() {
   const local = !shared && !window.ctlSheetActive;
+  selectOptions($("operationYear"), "전체 연도", [...new Set(programs.map(p => p.year).filter(Boolean))].sort((a,b) => b-a));
+  selectOptions($("operationFund"), "전체 재원", [...new Set([...standardFunds, ...programs.map(p => p.fund).filter(Boolean)])]);
   selectOptions($("operationPart"), "전체 파트", parts);
-  const selectedPart = $("operationPart").value;
-  const choices = programs.filter(program => !selectedPart || program.part === selectedPart);
+  selectOptions($("operationLead"), "전체 운영 유형", leads);
+  const choices = operatingPrograms({ ignoreProgram: true });
   const select = $("operationProgram");
   const previous = select.value;
-  select.replaceChildren(new Option("프로그램 선택", ""), ...choices.map(program =>
-    new Option(program.name + " · " + program.year + " · " + (program.part || "미분류"), program.id)));
+  select.replaceChildren(new Option("전체 프로그램", ""), ...choices.map(programOption));
   if (choices.some(program => program.id === previous)) select.value = previous;
-  const program = choices.find(item => item.id === select.value);
-  const indicatorSelect = $("operationIndicator");
-  const previousIndicator = indicatorSelect.value;
-  const options = program ? [
-    [primaryIndicatorId, program.indicator || "기본 성과지표", program.unit],
-    ...(program.extraIndicators ?? []).map((indicator, index) =>
-      [indicatorId(indicator, index), indicator.indicator, indicator.unit])
-  ] : [];
-  indicatorSelect.replaceChildren(...options.map(([id, name, unit]) => new Option(name + " (" + unit + ")", id)));
-  if (options.some(([id]) => id === previousIndicator)) indicatorSelect.value = previousIndicator;
-  $("operationForm").hidden = !operationEntryOpen || !program || !local;
-  $("operationNotice").textContent = !local ? "브라우저에 저장된 프로그램에서 운영 기록을 추가할 수 있습니다." :
-    !choices.length ? "프로그램 관리에서 프로그램을 먼저 등록해 주세요." :
-    program && !operationEntryOpen ? "지출이나 실적을 추가하려면 상단의 지출·실적 등록을 누르세요." :
-    "운영 기록은 이 브라우저에 저장됩니다. 이수인원은 회차별 연인원으로 집계합니다.";
-  const total = program && programTotals(program);
-  $("operationOpening").textContent = local && program?.spent ?
-    "기존 집행액 " + won(program.spent) + "이 누적 합계에 포함되어 있습니다." : "";
-  $("operationTotals").textContent = total ?
-    "누적 집행 " + won(total.spent) + " · 이수 " + number(total.completions ?? 0) +
-    "명 · 이수·운영 " + number(total.operatingHours ?? 0) + "시간" : "";
-  const records = program ? programOperations(program.id).slice().reverse() : [];
+  const visible = operatingPrograms();
+  const totals = visible.map(programTotals);
+  $("operationNotice").textContent = !local ? "건별 운영 기록은 브라우저에 저장된 프로그램에서 입력할 수 있습니다." :
+    !programs.length ? "프로그램 관리에서 프로그램을 먼저 등록해 주세요." :
+    "이수인원은 회차별 연인원으로 집계합니다.";
+  $("operationOpening").textContent = "";
+  $("operationTotals").textContent = totals.length ?
+    totals.length + "개 프로그램 · 누적 집행 " + won(sum(totals, "spent")) :
+    "조건에 맞는 프로그램이 없습니다.";
+  $("operationSummary").innerHTML = totals.map(p => `
+    <tr><td><button class="edit" type="button" data-filter-operation="${esc(p.id)}">${esc(p.name)}</button></td>
+    <td>${p.year || "—"}</td><td>${esc(p.fund)}</td><td>${esc(p.part || "미분류")}</td><td>${esc(p.lead || "—")}</td>
+    <td>${won(p.budget)}</td><td>${won(p.spent)}</td><td>${won(p.budget-p.spent)}</td><td>${pct(p.spent,p.budget)}</td>
+    <td class="hint">${operationDetails(p)}</td><td class="hint">${indicatorsFor(p).map(i => esc(i.indicator || "기본 지표") + " " + pct(i.actual,i.target)).join("<br>")}</td>
+    <td>${completionLabels[completionStatus(p)]}</td></tr>`
+  ).join("") || '<tr><td colspan="12">조건에 맞는 프로그램이 없습니다.</td></tr>';
+  const names = new Map(visible.map(program => [program.id, program.name]));
+  const records = local ? operationRecords.filter(record => names.has(record.programId)).slice().reverse() : [];
   $("operationRows").innerHTML = records.map(record => `
-    <tr><td>${esc(record.date)}</td><td>${operationTypeLabel(record.kind)}</td>
-    <td>${esc(record.label)}</td><td>${record.kind === "expense" ? won(record.amount) : "—"}</td>
+    <tr><td>${esc(names.get(record.programId))}</td><td>${esc(record.date)}</td><td>${operationTypeLabel(record.kind)}</td>
+    <td>${esc(record.label)}</td><td>${[record.department, record.faculty, record.facultyType ? teacherLabel(record.facultyType) : ""].filter(Boolean).map(esc).join(" · ") || "—"}</td><td>${record.kind === "expense" ? won(record.amount) : "—"}</td>
     <td>${record.kind === "session" ? number(record.people) + "명" : "—"}</td>
     <td>${record.kind === "session" ? number(record.hours) + "시간" : "—"}</td>
     <td>${record.kind === "indicator" ? esc(record.indicatorName) + " +" + number(record.value) + " " + esc(record.unit) :
       record.kind === "session" ? [record.applicants == null ? "" : "신청 " + number(record.applicants) + "명",
         record.requestedHours == null ? "" : "신청 운영 " + number(record.requestedHours) + "시간"].filter(Boolean).join(" · ") || "—" : "—"}</td>
     <td><button class="edit danger" type="button" data-remove-operation="${esc(record.id)}">삭제</button></td></tr>`
-  ).join("") || '<tr><td colspan="8">표시할 운영 기록이 없습니다.</td></tr>';
+  ).join("") || '<tr><td colspan="10">표시할 운영 기록이 없습니다.</td></tr>';
 }
+function openOperationEntry() {
+  if (!programs.length) {
+    $("operationNotice").textContent = "프로그램 관리에서 프로그램을 먼저 등록하세요.";
+    return;
+  }
+  $("operationForm").reset();
+  const select = $("operationEntryProgram");
+  select.replaceChildren(new Option("프로그램 선택", ""), ...programs.map(programOption));
+  const filtered = operatingPrograms();
+  select.value = $("operationProgram").value || (filtered.length === 1 ? filtered[0].id : "");
+  $("operationError").textContent = "";
+  updateOperationEntry();
+  $("operationDialog").showModal();
+}
+function updateOperationEntry() {
+  const program = programs.find(item => item.id === $("operationEntryProgram").value);
+  const academic = program?.lead === "학과주도";
+  for (const id of ["operationDepartment", "operationFaculty", "operationFacultyType"]) {
+    $(id).hidden = !academic;
+    $(id).querySelector("input, select").disabled = !academic;
+  }
+  $("operationDepartment").querySelector("input").required = academic;
+  const select = $("operationIndicator");
+  select.replaceChildren(...(program ? [
+    new Option((program.indicator || "기본 성과지표") + " (" + program.unit + ")", primaryIndicatorId),
+    ...(program.extraIndicators ?? []).map((indicator, index) =>
+      new Option(indicator.indicator + " (" + indicator.unit + ")", indicatorId(indicator, index)))
+  ] : []));
+  setOperationFields();
+}
+$("operationClose").onclick = () => $("operationDialog").close();
+$("operationEntryProgram").addEventListener("change", updateOperationEntry);
+$("operationSummary").addEventListener("click", event => {
+  const id = event.target.closest("[data-filter-operation]")?.dataset.filterOperation;
+  if (id) { $("operationProgram").value = id; renderOperations(); }
+});
 function operationTypeLabel(kind) {
   return { expense: "지출", session: "신청·운영 실적", indicator: "성과 달성값" }[kind] ?? "";
 }
@@ -655,11 +686,11 @@ function saveOperations(change) {
   return true;
 }
 $("operationKind").addEventListener("change", setOperationFields);
-for (const id of ["operationPart", "operationProgram"]) $(id).addEventListener("change", renderOperations);
+for (const id of ["operationYear", "operationFund", "operationPart", "operationLead", "operationProgram"]) $(id).addEventListener("change", renderOperations);
 $("operationForm").addEventListener("submit", event => {
   event.preventDefault();
   if (shared || window.ctlSheetActive) return;
-  const programId = $("operationProgram").value;
+  const programId = $("operationEntryProgram").value;
   const program = programs.find(item => item.id === programId);
   if (!program) return;
   const data = new FormData(event.currentTarget);
@@ -687,14 +718,23 @@ $("operationForm").addEventListener("submit", event => {
     };
   }
   if (!label || !date || !details) {
-    $("operationNotice").textContent = "날짜, 항목과 수치를 확인하세요.";
+    $("operationError").textContent = "날짜, 항목과 수치를 확인하세요.";
     return;
   }
-  const record = { id: crypto.randomUUID(), programId, kind, date, label, ...details };
+  const department = String(data.get("department") ?? "").trim();
+  const faculty = String(data.get("faculty") ?? "").trim();
+  const facultyType = String(data.get("facultyType") ?? "");
+  if (program.lead === "학과주도" && (!department || Boolean(faculty) !== Boolean(facultyType))) {
+    $("operationError").textContent = "학과명을 입력하세요. 운영교수를 기록할 때는 이름과 교원 유형을 함께 입력하세요.";
+    return;
+  }
+  const record = { id: crypto.randomUUID(), programId, kind, date, label, ...details,
+    ...(program.lead === "학과주도" ? { department, faculty, facultyType } : {}) };
   if (saveOperations(records => [...records, record])) {
-    event.currentTarget.reset();
-    setOperationFields();
+    $("operationDialog").close();
     $("operationNotice").textContent = "기록을 추가했습니다. 프로그램 관리에도 누적 반영됩니다.";
+  } else {
+    $("operationError").textContent = "운영 기록을 저장하지 못했습니다. 브라우저 저장 공간을 확인하세요.";
   }
 });
 $("operationRows").addEventListener("click", event => {
