@@ -23,18 +23,20 @@ function programOperations(id) {
 }
 const primaryIndicatorId = "primary";
 const indicatorId = (indicator, index) => indicator.id ?? "existing-" + index;
+const operationKinds = record => record.kinds ?? [record.kind];
+const hasOperation = (record, kind) => operationKinds(record).includes(kind);
 function programTotals(program) {
   const records = programOperations(program.id);
   if (!records.length) return program;
-  const sessions = records.filter(record => record.kind === "session");
+  const sessions = records.filter(record => hasOperation(record, "session"));
   const addSession = (base, field) => sessions.some(record => record[field] != null)
     ? (base ?? 0) + sessions.reduce((total, record) => total + (record[field] ?? 0), 0) : base;
-  const achievements = records.filter(record => record.kind === "indicator");
+  const achievements = records.filter(record => hasOperation(record, "indicator"));
   const achieved = (base, id) => (base ?? 0) +
     sum(achievements.filter(record => record.indicatorId === id), "value");
   return {
     ...program,
-    spent: (program.spent ?? 0) + sum(records.filter(record => record.kind === "expense"), "amount"),
+    spent: (program.spent ?? 0) + sum(records.filter(record => hasOperation(record, "expense")), "amount"),
     applicants: addSession(program.applicants, "applicants"),
     requestedHours: addSession(program.requestedHours, "requestedHours"),
     completions: addSession(program.completions, "people"),
@@ -531,8 +533,8 @@ function operationCsvRows() {
   const rows = [["사업연도", "파트", "프로그램", "날짜", "유형", "항목·회차", "지출액(원)", "이수인원(명)", "이수·운영시간(시간)", "신청인원(명)", "신청 운영시간(시간)", "성과지표", "단위", "추가 달성값", "학과명", "운영교수", "교원 유형"]];
   for (const program of operatingPrograms()) {
     for (const record of programOperations(program.id)) {
-      const expense = record.kind === "expense";
-      rows.push([program.year, program.part, program.name, record.date, operationTypeLabel(record.kind),
+      const expense = hasOperation(record, "expense");
+      rows.push([program.year, program.part, program.name, record.date, operationKinds(record).map(operationTypeLabel).join(" · "),
         record.label, expense ? record.amount : "", record.people ?? "", record.hours ?? "",
         record.applicants ?? "", record.requestedHours ?? "", record.indicatorName ?? "", record.unit ?? "", record.value ?? "",
         record.department ?? "", record.faculty ?? "", record.facultyType ? teacherLabel(record.facultyType) : ""]);
@@ -614,13 +616,15 @@ function renderOperations() {
   const names = new Map(visible.map(program => [program.id, program.name]));
   const records = local ? operationRecords.filter(record => names.has(record.programId)).slice().reverse() : [];
   $("operationRows").innerHTML = records.map(record => `
-    <tr><td>${esc(names.get(record.programId))}</td><td>${esc(record.date)}</td><td>${operationTypeLabel(record.kind)}</td>
-    <td>${esc(record.label)}</td><td>${[record.department, record.faculty, record.facultyType ? teacherLabel(record.facultyType) : ""].filter(Boolean).map(esc).join(" · ") || "—"}</td><td>${record.kind === "expense" ? won(record.amount) : "—"}</td>
-    <td>${record.kind === "session" ? number(record.people) + "명" : "—"}</td>
-    <td>${record.kind === "session" ? number(record.hours) + "시간" : "—"}</td>
-    <td>${record.kind === "indicator" ? esc(record.indicatorName) + " +" + number(record.value) + " " + esc(record.unit) :
-      record.kind === "session" ? [record.applicants == null ? "" : "신청 " + number(record.applicants) + "명",
-        record.requestedHours == null ? "" : "신청 운영 " + number(record.requestedHours) + "시간"].filter(Boolean).join(" · ") || "—" : "—"}</td>
+    <tr><td>${esc(names.get(record.programId))}</td><td>${esc(record.date)}</td><td>${operationKinds(record).map(operationTypeLabel).join(" · ")}</td>
+    <td>${esc(record.label)}</td><td>${[record.department, record.faculty, record.facultyType ? teacherLabel(record.facultyType) : ""].filter(Boolean).map(esc).join(" · ") || "—"}</td><td>${hasOperation(record, "expense") ? won(record.amount) : "—"}</td>
+    <td>${hasOperation(record, "session") ? number(record.people) + "명" : "—"}</td>
+    <td>${hasOperation(record, "session") ? number(record.hours) + "시간" : "—"}</td>
+    <td>${[
+      record.applicants == null ? "" : "신청 " + number(record.applicants) + "명",
+      record.requestedHours == null ? "" : "신청 운영 " + number(record.requestedHours) + "시간",
+      hasOperation(record, "indicator") ? esc(record.indicatorName) + " +" + number(record.value) + " " + esc(record.unit) : ""
+    ].filter(Boolean).join("<br>") || "—"}</td>
     <td><button class="edit danger" type="button" data-remove-operation="${esc(record.id)}">삭제</button></td></tr>`
   ).join("") || '<tr><td colspan="10">표시할 운영 기록이 없습니다.</td></tr>';
 }
@@ -664,13 +668,15 @@ function operationTypeLabel(kind) {
   return { expense: "지출", session: "신청·운영 실적", indicator: "성과 달성값" }[kind] ?? "";
 }
 function setOperationFields() {
-  const kind = $("operationKind").value;
-  $("operationLabel").textContent = { expense: "지출 항목", session: "회차·운영 내용", indicator: "성과 기록 내용" }[kind];
+  const kinds = [...$("operationForm").querySelectorAll('[name="kind"]:checked')].map(input => input.value);
+  const labels = { expense: "지출 항목", session: "회차·운영 내용", indicator: "성과 기록 내용" };
+  $("operationLabel").textContent = kinds.length === 1 ? labels[kinds[0]] : "항목·회차";
   for (const [id, type] of [["operationAmount", "expense"], ["operationPeople", "session"],
     ["operationHours", "session"], ["operationApplicants", "session"], ["operationRequested", "session"],
     ["operationIndicatorField", "indicator"], ["operationActual", "indicator"]]) {
-    $(id).hidden = kind !== type;
-    $(id).querySelector("input, select").disabled = kind !== type;
+    const active = kinds.includes(type);
+    $(id).hidden = !active;
+    $(id).querySelector("input, select").disabled = !active;
   }
 }
 function saveOperations(change) {
@@ -685,7 +691,9 @@ function saveOperations(change) {
   render();
   return true;
 }
-$("operationKind").addEventListener("change", setOperationFields);
+$("operationForm").addEventListener("change", event => {
+  if (event.target.name === "kind") setOperationFields();
+});
 for (const id of ["operationYear", "operationFund", "operationPart", "operationLead", "operationProgram"]) $(id).addEventListener("change", renderOperations);
 $("operationForm").addEventListener("submit", event => {
   event.preventDefault();
@@ -694,32 +702,35 @@ $("operationForm").addEventListener("submit", event => {
   const program = programs.find(item => item.id === programId);
   if (!program) return;
   const data = new FormData(event.currentTarget);
-  const kind = data.get("kind"), date = String(data.get("date") ?? ""), label = String(data.get("label") ?? "").trim();
-  let details;
-  if (kind === "expense") {
+  const kinds = data.getAll("kind");
+  const date = String(data.get("date") ?? ""), label = String(data.get("label") ?? "").trim();
+  const details = {};
+  const fail = message => { $("operationError").textContent = message; };
+  if (!kinds.length) return fail("기록 유형을 하나 이상 선택하세요.");
+  if (!label || !date) return fail("날짜와 항목·회차를 입력하세요.");
+  if (kinds.includes("expense")) {
     const amount = Number(data.get("amount"));
-    if (Number.isSafeInteger(amount) && amount > 0) details = { amount };
-  } else if (kind === "session") {
+    if (!Number.isSafeInteger(amount) || amount <= 0) return fail("지출 금액을 확인하세요.");
+    details.amount = amount;
+  }
+  if (kinds.includes("session")) {
     const people = Number(data.get("people")), hours = Number(data.get("hours"));
     const optional = key => data.get(key) === "" ? null : Number(data.get(key));
     const applicants = optional("applicants"), requestedHours = optional("requestedHours");
-    if (Number.isSafeInteger(people) && people >= 0 && Number.isFinite(hours) && hours >= 0 &&
-        (applicants == null || Number.isSafeInteger(applicants) && applicants >= 0) &&
-        (requestedHours == null || Number.isFinite(requestedHours) && requestedHours >= 0)) {
-      details = { people, hours, applicants, requestedHours };
+    if (!Number.isSafeInteger(people) || people < 0 || !Number.isFinite(hours) || hours < 0 ||
+        (applicants != null && (!Number.isSafeInteger(applicants) || applicants < 0)) ||
+        (requestedHours != null && (!Number.isFinite(requestedHours) || requestedHours < 0))) {
+      return fail("신청·운영 실적의 인원과 시간을 확인하세요.");
     }
-  } else if (kind === "indicator") {
+    Object.assign(details, { people, hours, applicants, requestedHours });
+  }
+  if (kinds.includes("indicator")) {
     const selected = data.get("indicatorId");
     const indicator = selected === primaryIndicatorId ? program :
       (program.extraIndicators ?? []).find((item, index) => indicatorId(item, index) === selected);
     const value = parseIndicatorNumber(data.get("indicatorValue"));
-    if (indicator && Number.isFinite(value)) details = {
-      indicatorId: selected, indicatorName: indicator.indicator || "기본 성과지표", unit: indicator.unit, value
-    };
-  }
-  if (!label || !date || !details) {
-    $("operationError").textContent = "날짜, 항목과 수치를 확인하세요.";
-    return;
+    if (!indicator || !Number.isFinite(value)) return fail("성과지표와 추가 달성값을 확인하세요.");
+    Object.assign(details, { indicatorId: selected, indicatorName: indicator.indicator || "기본 성과지표", unit: indicator.unit, value });
   }
   const department = String(data.get("department") ?? "").trim();
   const faculty = String(data.get("faculty") ?? "").trim();
@@ -728,7 +739,7 @@ $("operationForm").addEventListener("submit", event => {
     $("operationError").textContent = "학과명을 입력하세요. 운영교수를 기록할 때는 이름과 교원 유형을 함께 입력하세요.";
     return;
   }
-  const record = { id: crypto.randomUUID(), programId, kind, date, label, ...details,
+  const record = { id: crypto.randomUUID(), programId, kinds, date, label, ...details,
     ...(program.lead === "학과주도" ? { department, faculty, facultyType } : {}) };
   if (saveOperations(records => [...records, record])) {
     $("operationDialog").close();

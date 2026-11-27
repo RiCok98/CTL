@@ -44,7 +44,14 @@
 <label id="operationFacultyType" hidden>교원 유형<select name="facultyType" disabled>
 <option value="">선택</option><optgroup label="전담전임교원"><option>산학전담</option><option>강의전담</option><option>교육전담</option></optgroup><option>일반전임교원</option>
 </select></label>
-<label>기록 유형<select id="operationKind" name="kind"><option value="expense">지출</option><option value="session">신청·운영 실적</option><option value="indicator">성과 달성값</option></select></label>
+<fieldset class="wide detail-section operation-kinds"><legend>기록 유형</legend>
+<div class="actions">
+<label><input type="checkbox" name="kind" value="expense" checked>지출</label>
+<label><input type="checkbox" name="kind" value="session">신청·운영 실적</label>
+<label><input type="checkbox" name="kind" value="indicator">성과 달성값</label>
+</div>
+<p class="hint">필요한 항목을 함께 선택해 한 번에 저장할 수 있습니다.</p>
+</fieldset>
 <label>날짜<input name="date" type="date" required></label>
 <label class="wide"><span id="operationLabel">지출 항목</span><input name="label" maxlength="100" required></label>
 <label id="operationAmount">금액 (원)<input name="amount" type="number" min="1" max="999999999999" step="1" required></label>
