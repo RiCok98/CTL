@@ -62,6 +62,7 @@ let accountName = "";
 let saving = false;
 let legacy = [];
 let view = "dashboard";
+let operationEntryOpen = false;
 let storageError = "";
 try {
   const stored = JSON.parse(localStorage.getItem(key));
@@ -171,7 +172,9 @@ function renderDashboardDetails(items, comparison) {
   }).join("");
 }
 function render() {
-  $("add").hidden = !["programs", "operations"].includes(view) || !!window.ctlSheetActive;
+  $("add").hidden = !["programs", "operations"].includes(view) || !!window.ctlSheetActive ||
+    (view === "operations" && shared);
+  $("add").textContent = view === "operations" ? "＋ 지출·실적 등록" : "＋ 프로그램 등록";
   $("export").hidden = !["programs", "operations"].includes(view);
   $("export").textContent = view === "operations" ? "운영 기록 CSV 내보내기" : "CSV 내보내기";
   $("export").disabled = view === "operations" && (shared || !!window.ctlSheetActive);
@@ -232,6 +235,7 @@ function render() {
   ).join("") || '<tr><td colspan="7">등록된 프로그램이 없습니다.</td></tr>';
 }
 function setView(next) {
+  if (next !== "operations") operationEntryOpen = false;
   view = next;
   const heading = {
     dashboard: ["대시보드", "CTL 운영 대시보드", "재원별 프로그램의 예산 집행과 목표 달성 현황을 확인하세요."],
@@ -453,18 +457,30 @@ $("form").addEventListener("submit", async event => {
       if ($(id).value && $(id).value !== String(value)) $(id).value = "";
     }
     if (!editing) { $("query").value = ""; $("statusFilter").value = ""; }
-    if (view === "operations") {
-      showProgramOperations(p);
-    } else {
-      setView(view === "funding" ? "programs" : view);
-    }
+    setView(view === "funding" ? "programs" : view);
   }
 });
 $("remove").onclick = async () => {
   if (editing && confirm(editing.name + " 프로그램을 삭제할까요?") &&
       await persist(editing, true)) render();
 };
-$("add").onclick = () => openEdit();
+$("add").onclick = () => {
+  if (view !== "operations") {
+    openEdit();
+    return;
+  }
+  if (shared || window.ctlSheetActive) return;
+  if (!$("operationProgram").value) {
+    $("operationNotice").textContent = programs.length ?
+      "지출·실적을 기록할 프로그램을 먼저 선택하세요." :
+      "프로그램 관리에서 프로그램을 먼저 등록하세요.";
+    $("operationProgram").focus();
+    return;
+  }
+  operationEntryOpen = true;
+  renderOperations();
+  $("operationKind").focus();
+};
 $("close").onclick = $("cancel").onclick = () => $("dialog").close();
 document.addEventListener("click", event => {
   const button = event.target.closest("button");
@@ -590,9 +606,10 @@ function renderOperations() {
   ] : [];
   indicatorSelect.replaceChildren(...options.map(([id, name, unit]) => new Option(name + " (" + unit + ")", id)));
   if (options.some(([id]) => id === previousIndicator)) indicatorSelect.value = previousIndicator;
-  $("operationForm").hidden = !program || !local;
+  $("operationForm").hidden = !operationEntryOpen || !program || !local;
   $("operationNotice").textContent = !local ? "브라우저에 저장된 프로그램에서 운영 기록을 추가할 수 있습니다." :
     !choices.length ? "프로그램 관리에서 프로그램을 먼저 등록해 주세요." :
+    program && !operationEntryOpen ? "지출이나 실적을 추가하려면 상단의 지출·실적 등록을 누르세요." :
     "운영 기록은 이 브라우저에 저장됩니다. 이수인원은 회차별 연인원으로 집계합니다.";
   const total = program && programTotals(program);
   $("operationOpening").textContent = local && program?.spent ?
