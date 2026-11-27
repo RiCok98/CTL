@@ -21,7 +21,7 @@ const sample = [
 ].map(([name, fund, budget, spent, target, actual, unit], i) => ({
   id: "sample-" + i, name, fund, budget, spent, target, actual, unit, year: thisYear, owner: "", part: [parts[1], parts[0], parts[1], parts[0], parts[2], parts[2]][i], lead: leads[i % 2], org: ""
 }));
-let programs = sample;
+let programs = [];
 let editing;
 let shared = false;
 let accountName = "";
@@ -32,11 +32,21 @@ let storageError = "";
 try {
   const stored = JSON.parse(localStorage.getItem(key));
   if (Array.isArray(stored)) {
-    programs = stored.map(p => ({ part: "", lead: "", org: "", ...p }));
-    legacy = programs.filter(p => {
-      const example = sample.find(item => item.id === p.id);
-      return !example || Object.keys(p).some(field => !["part", "lead", "org"].includes(field) && p[field] !== example[field]);
-    });
+    const isUntouchedSample = program => {
+      const original = sample.find(item => item.id === program?.id);
+      if (!original) return false;
+      return Object.entries(program).every(([field, value]) => {
+        if (field === "year") return true;
+        if (!Object.hasOwn(original, field)) return value == null || value === "" ||
+          (Array.isArray(value) && value.length === 0);
+        if (["part", "lead", "org"].includes(field) && !value) return true;
+        return value === original[field];
+      });
+    };
+    const retained = stored.filter(program => !isUntouchedSample(program));
+    programs = retained.map(p => ({ part: "", lead: "", org: "", ...p }));
+    legacy = programs;
+    if (retained.length !== stored.length) localStorage.setItem(key, JSON.stringify(retained));
   }
 } catch {
   storageError = "저장된 데이터를 읽을 수 없습니다.";
@@ -128,8 +138,7 @@ function render() {
   const selectedYear = view === "funding" ? $("fundYear").value : $("year").value;
   $("yearBadge").textContent = selectedYear ? selectedYear + " 사업연도" : "전체 사업연도";
   const messages = [storageError, shared && programs.some(p => p.local) ?
-    "이 브라우저의 기존 프로그램은 ‘로컬’로 표시됩니다. 파트와 운영 유형을 지정하고 저장하면 팀에 공유됩니다." : "", programs.some(p => p.id.startsWith("sample-")) ?
-    "예시 데이터가 포함되어 있습니다. 프로그램 목록에서 수정하거나 삭제할 수 있습니다." : ""].filter(Boolean);
+    "이 브라우저의 기존 프로그램은 ‘로컬’로 표시됩니다. 파트와 운영 유형을 지정하고 저장하면 팀에 공유됩니다." : ""].filter(Boolean);
   $("notice").textContent = messages.join(" ");
   $("notice").hidden = !messages.length;
 
