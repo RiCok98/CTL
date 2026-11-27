@@ -11,6 +11,27 @@ const teacherLabel = type => ["일반전임교원", "직원"].includes(type) ? t
 const affiliationLabel = type => type === "직원" ? "소속 부서" : "소속 학과";
 const leads = ["학과주도", "부서주도", "기타"];
 const key = "ctl-programs-v1";
+const operationsKey = "ctl-operations-v1";
+function readOperations() {
+  const stored = JSON.parse(localStorage.getItem(operationsKey));
+  return Array.isArray(stored) ? stored : [];
+}
+let operationRecords = [];
+try { operationRecords = readOperations(); } catch {}
+function programOperations(id) {
+  return shared || window.ctlSheetActive ? [] : operationRecords.filter(record => record.programId === id);
+}
+function programTotals(program) {
+  const records = programOperations(program.id);
+  if (!records.length) return program;
+  const sessions = records.filter(record => record.kind === "session");
+  return {
+    ...program,
+    spent: (program.spent ?? 0) + sum(records.filter(record => record.kind === "expense"), "amount"),
+    completions: sessions.length ? (program.completions ?? 0) + sum(sessions, "people") : program.completions,
+    operatingHours: sessions.length ? (program.operatingHours ?? 0) + sum(sessions, "hours") : program.operatingHours
+  };
+}
 const sample = [
   ["신입생 학습전략 워크숍", "대학혁신지원사업", 12000000, 9800000, 200, 218, "명"],
   ["교수법 연구공동체", "대학혁신지원사업", 18000000, 12700000, 15, 12, "팀"],
@@ -68,7 +89,7 @@ function selectOptions(select, first, values, defaultValue = "") {
 }
 function filteredPrograms({ includeAllParts = false } = {}) {
   const query = $("query").value.trim().toLocaleLowerCase("ko-KR");
-  return programs.filter(p =>
+  return programs.map(programTotals).filter(p =>
     (!$("year").value || p.year === Number($("year").value)) &&
     (!$("fund").value || p.fund === $("fund").value) &&
     (includeAllParts || !$("part").value || p.part === $("part").value) &&
@@ -79,7 +100,7 @@ function filteredPrograms({ includeAllParts = false } = {}) {
   );
 }
 function fundingPrograms() {
-  return programs.filter(p => (!$("fundYear").value || p.year === Number($("fundYear").value)) &&
+  return programs.map(programTotals).filter(p => (!$("fundYear").value || p.year === Number($("fundYear").value)) &&
     (!$("fundPart").value || p.part === $("fundPart").value) &&
     (!$("fundLead").value || p.lead === $("fundLead").value) && matchesCompletion(p, "fundCompletion"));
 }
@@ -142,6 +163,7 @@ function render() {
   $("notice").textContent = messages.join(" ");
   $("notice").hidden = !messages.length;
 
+  if (view === "operations") renderOperations();
   const items = filteredPrograms();
   const comparison = filteredPrograms({ includeAllParts: true });
   renderDashboardDetails(items, comparison);
@@ -169,7 +191,7 @@ function render() {
   ).join("") || '<p class="empty">목표 미달 프로그램이 없습니다.</p>';
   $("count").textContent = "· " + items.length + "개";
   $("rows").innerHTML = items.map(p =>
-    `<tr><td><button class="edit" type="button" data-edit="${esc(p.id)}">${esc(p.name)}</button><br><small class="hint">${p.year}${p.owner ? " · " + esc(p.owner) : ""}${p.local ? " · 로컬" : ""}</small></td><td>${esc(p.part || "미분류")}</td><td>${esc(p.lead || "미분류")}${p.org ? "<br><small class=hint>" + esc(p.org) + "</small>" : ""}</td><td>${esc(p.fund)}</td><td>${won(p.budget)}</td><td>${won(p.spent)}${p.expenses?.length ? "<br><small class=hint>세부 " + p.expenses.length + "건</small>" : ""}</td><td>${pct(p.spent,p.budget)}</td><td>${p.indicator ? "<b>" + esc(p.indicator) + "</b><br>" : ""}<small class="hint" title="전년도 실적">${p.year - 1} 실적 ${p.priorActual == null ? "—" : number(p.priorActual) + " " + esc(p.unit)}</small><br>${p.year} 목표 ${number(p.target)} / 실적 ${number(p.actual)} ${esc(p.unit)}</td><td>${pct(p.actual,p.target)}</td><td><span class="status ${status(p)}">${labels[status(p)]}</span><br><small class="hint">운영 상태: ${completionLabels[completionStatus(p)]}</small></td><td class="hint">${operationDetails(p)}</td><td>${(p.teachers ?? []).map(t => esc(t.name) + " <small class=hint>(" + esc(teacherLabel(t.type)) + (t.affiliation ? " · " + esc(t.affiliation) : "") + ")</small>").join("<br>") || "—"}</td></tr>`
+    `<tr><td><button class="edit" type="button" data-edit="${esc(p.id)}">${esc(p.name)}</button><br><small class="hint">${p.year}${p.owner ? " · " + esc(p.owner) : ""}${p.local ? " · 로컬" : ""}</small></td><td>${esc(p.part || "미분류")}</td><td>${esc(p.lead || "미분류")}${p.org ? "<br><small class=hint>" + esc(p.org) + "</small>" : ""}</td><td>${esc(p.fund)}</td><td>${won(p.budget)}</td><td>${won(p.spent)}<br><small class="hint">잔액 ${won(p.budget - p.spent)}</small>${p.expenses?.length ? "<br><small class=hint>세부 " + p.expenses.length + "건</small>" : ""}</td><td>${pct(p.spent,p.budget)}</td><td>${p.indicator ? "<b>" + esc(p.indicator) + "</b><br>" : ""}<small class="hint" title="전년도 실적">${p.year - 1} 실적 ${p.priorActual == null ? "—" : number(p.priorActual) + " " + esc(p.unit)}</small><br>${p.year} 목표 ${number(p.target)} / 실적 ${number(p.actual)} ${esc(p.unit)}</td><td>${pct(p.actual,p.target)}</td><td><span class="status ${status(p)}">${labels[status(p)]}</span><br><small class="hint">운영 상태: ${completionLabels[completionStatus(p)]}</small></td><td class="hint">${operationDetails(p)}</td><td>${(p.teachers ?? []).map(t => esc(t.name) + " <small class=hint>(" + esc(teacherLabel(t.type)) + (t.affiliation ? " · " + esc(t.affiliation) : "") + ")</small>").join("<br>") || "—"}</td></tr>`
   ).join("") || '<tr><td colspan="12">조건에 맞는 프로그램이 없습니다.</td></tr>';
   $("fundRows").innerHTML = groups(fundingPrograms()).map(g =>
     `<tr><td><button class="edit" data-fund="${esc(g.fund)}">${esc(g.fund)}</button></td><td>${g.items.length}개</td><td>${won(g.budget)}</td><td>${won(g.spent)}</td><td>${won(g.budget-g.spent)}</td><td>${pct(g.spent,g.budget)}</td><td>${g.reached} / ${g.tracked}개</td></tr>`
@@ -179,14 +201,18 @@ function setView(next) {
   view = next;
   const heading = {
     dashboard: ["대시보드", "CTL 운영 대시보드", "재원별 프로그램의 예산 집행과 목표 달성 현황을 확인하세요."],
-    programs: ["프로그램", "프로그램 관리", "프로그램을 등록하고 편성액, 집행액 및 성과를 업데이트하세요."],
+    programs: ["프로그램 관리", "프로그램 관리", "전체 프로그램과 누적 집행·이수 실적을 확인하세요."],
+    operations: ["프로그램 운영현황", "프로그램 운영현황", "프로그램별 지출과 회차별 이수 실적을 기록하세요."],
     funding: ["재원별 현황", "재원별 현황", "재원별 예산 잔액과 목표 달성 프로그램 수를 확인하세요."]
   }[next];
   $("crumb").textContent = "운영관리 / " + heading[0];
   $("title").textContent = heading[1];
   $("subtitle").textContent = heading[2];
   $("dashboardDetails").hidden = $("stats").hidden = $("overview").hidden = next !== "dashboard";
-  $("programPanel").hidden = next === "funding";
+  $("programPanel").hidden = !["dashboard", "programs"].includes(next);
+  $("operationPanel").hidden = next !== "operations";
+  $("add").hidden = next === "operations" || !!window.ctlSheetActive;
+  $("export").hidden = next === "operations";
   $("fundPanel").hidden = next !== "funding";
   document.querySelectorAll("[data-view]").forEach(b => b.setAttribute("aria-pressed", b.dataset.view === next));
   render();
@@ -357,7 +383,12 @@ $("close").onclick = $("cancel").onclick = () => $("dialog").close();
 document.addEventListener("click", event => {
   const button = event.target.closest("button");
   if (!button) return;
-  if (button.dataset.view) setView(button.dataset.view);
+  if (button.dataset.view) {
+    if (button.dataset.view === "programs") {
+      for (const id of ["query", "year", "fund", "part", "lead", "statusFilter", "completionFilter"]) $(id).value = "";
+    }
+    setView(button.dataset.view);
+  }
   if (button.dataset.edit) openEdit(button.dataset.edit);
   if (button.dataset.fund) {
     $("fund").value = button.dataset.fund;
@@ -417,6 +448,85 @@ async function initialize() {
   }
   render();
 }
+function renderOperations() {
+  const local = !shared && !window.ctlSheetActive;
+  selectOptions($("operationPart"), "전체 파트", parts);
+  const selectedPart = $("operationPart").value;
+  const choices = programs.filter(program => !selectedPart || program.part === selectedPart);
+  const select = $("operationProgram");
+  const previous = select.value;
+  select.replaceChildren(new Option("프로그램 선택", ""), ...choices.map(program =>
+    new Option(program.name + " · " + program.year + " · " + (program.part || "미분류"), program.id)));
+  if (choices.some(program => program.id === previous)) select.value = previous;
+  const program = choices.find(item => item.id === select.value);
+  $("operationForm").hidden = !program || !local;
+  $("operationNotice").textContent = !local ? "브라우저에 저장된 프로그램에서 운영 기록을 추가할 수 있습니다." :
+    !choices.length ? "프로그램 관리에서 프로그램을 먼저 등록해 주세요." :
+    "운영 기록은 이 브라우저에 저장됩니다. 이수인원은 회차별 연인원으로 집계합니다.";
+  const total = program && programTotals(program);
+  $("operationTotals").textContent = total ?
+    "누적 집행 " + won(total.spent) + " · 이수 " + number(total.completions ?? 0) +
+    "명 · 이수·운영 " + number(total.operatingHours ?? 0) + "시간" : "";
+  const records = program ? programOperations(program.id).slice().reverse() : [];
+  $("operationRows").innerHTML = records.map(record => `
+    <tr><td>${esc(record.date)}</td><td>${record.kind === "expense" ? "지출" : "운영 실적"}</td>
+    <td>${esc(record.label)}</td><td>${record.kind === "expense" ? won(record.amount) : "—"}</td>
+    <td>${record.kind === "session" ? number(record.people) + "명" : "—"}</td>
+    <td>${record.kind === "session" ? number(record.hours) + "시간" : "—"}</td>
+    <td><button class="edit danger" type="button" data-remove-operation="${esc(record.id)}">삭제</button></td></tr>`
+  ).join("") || '<tr><td colspan="7">표시할 운영 기록이 없습니다.</td></tr>';
+}
+function setOperationFields() {
+  const expense = $("operationKind").value === "expense";
+  $("operationLabel").textContent = expense ? "지출 항목" : "회차·운영 내용";
+  for (const [id, visible] of [["operationAmount", expense], ["operationPeople", !expense], ["operationHours", !expense]]) {
+    $(id).hidden = !visible;
+    $(id).querySelector("input").disabled = !visible;
+  }
+}
+function saveOperations(change) {
+  try {
+    const next = change(readOperations());
+    localStorage.setItem(operationsKey, JSON.stringify(next));
+    operationRecords = next;
+  } catch {
+    $("operationNotice").textContent = "운영 기록을 저장하지 못했습니다. 브라우저 저장 공간을 확인하세요.";
+    return false;
+  }
+  render();
+  return true;
+}
+$("operationKind").addEventListener("change", setOperationFields);
+for (const id of ["operationPart", "operationProgram"]) $(id).addEventListener("change", renderOperations);
+$("operationForm").addEventListener("submit", event => {
+  event.preventDefault();
+  if (shared || window.ctlSheetActive) return;
+  const programId = $("operationProgram").value;
+  if (!programs.some(program => program.id === programId)) return;
+  const data = new FormData(event.currentTarget);
+  const kind = data.get("kind"), date = String(data.get("date") ?? ""), label = String(data.get("label") ?? "").trim();
+  const amount = Number(data.get("amount")), people = Number(data.get("people")), hours = Number(data.get("hours"));
+  if (!label || !date || (kind === "expense" ? !Number.isSafeInteger(amount) || amount <= 0 :
+      !Number.isSafeInteger(people) || people < 0 || !Number.isFinite(hours) || hours < 0)) {
+    $("operationNotice").textContent = "날짜, 항목과 수치를 확인하세요.";
+    return;
+  }
+  const record = { id: crypto.randomUUID(), programId, kind, date, label, ...(kind === "expense" ? { amount } : { people, hours }) };
+  if (saveOperations(records => [...records, record])) {
+    event.currentTarget.reset();
+    setOperationFields();
+    $("operationNotice").textContent = "기록을 추가했습니다. 프로그램 관리에도 누적 반영됩니다.";
+  }
+});
+$("operationRows").addEventListener("click", event => {
+  const id = event.target.closest("[data-remove-operation]")?.dataset.removeOperation;
+  if (id && confirm("이 운영 기록을 삭제할까요?")) saveOperations(records => records.filter(record => record.id !== id));
+});
+window.addEventListener("storage", event => {
+  if (event.key === operationsKey) {
+    try { operationRecords = readOperations(); render(); } catch {}
+  }
+});
 initialize();
 
 const geminiModel = "gemini-3.5-flash-lite";
