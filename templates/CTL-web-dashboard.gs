@@ -1,4 +1,3 @@
-/** @OnlyCurrentDoc */
 function setupCtlWebApp() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet();
   if (!sheet) throw new Error('CTL 시트의 확장 프로그램 메뉴에서 연 프로젝트에서 실행하세요.');
