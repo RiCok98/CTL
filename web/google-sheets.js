@@ -85,6 +85,10 @@
         if (simple) {
           r = Array(27).fill("");
           for (const [original, basic] of [[0,0],[1,1],[2,2],[7,3],[8,4],[20,7],[22,8],[23,9]]) r[original] = source[basic] ?? "";
+          if (headers[16] === "운영 유형" && headers[17] === "주관 학과·부서") {
+            r[3] = source[16] ?? "";
+            r[4] = source[17] ?? "";
+          }
         } else if (compact) {
           r = Array(27).fill("");
           for (const [original, summary] of [[0,0],[1,1],[2,2],[3,4],[6,5],[7,6],[8,7],[22,11],[23,12],[26,10]]) {
