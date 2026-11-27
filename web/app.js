@@ -75,7 +75,14 @@ try {
 const number = value => new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 4 }).format(value);
 const won = value => number(value) + "원";
 const pct = (value, base) => base ? (100 * value / base).toFixed(1).replace(/\.0$/, "") + "%" : "—";
-const status = p => p.target <= 0 ? "neutral" : p.actual >= p.target ? "ok" : "pending";
+const indicatorsFor = p => [p, ...(p.extraIndicators ?? [])];
+const targetsFor = p => indicatorsFor(p).filter(indicator => indicator.target > 0);
+function status(p) {
+  const targets = targetsFor(p);
+  if (!targets.length) return "neutral";
+  return targets.every(indicator => indicator.actual >= indicator.target) ? "ok" : "pending";
+}
+const lowestRate = p => Math.min(...targetsFor(p).map(indicator => indicator.actual / indicator.target));
 const labels = { neutral: "목표 미설정", ok: "달성", pending: "미달" };
 const esc = value => String(value).replace(/[&<>"']/g, character => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -108,7 +115,7 @@ function groups(items) {
   return Array.from(Map.groupBy(items, p => p.fund), ([fund, items]) => ({
     fund, items, budget: sum(items, "budget"), spent: sum(items, "spent"),
     reached: items.filter(p => status(p) === "ok").length,
-    tracked: items.filter(p => p.target > 0).length
+    tracked: items.filter(p => targetsFor(p).length).length
   }));
 }
 function operationDetails(p) {
@@ -122,7 +129,9 @@ function metricBar(label, numerator, denominator) {
   return `<div><div class="barlabel"><span>${label}</span><strong>${pct(numerator, denominator)}</strong></div><div class="track"><div class="fill" style="width:${width}%"></div></div></div>`;
 }
 function renderDashboardDetails(items, comparison) {
-  const indicators = items.filter(p => p.indicator && /^(대학AID|대학혁신(?:지원사업)?)$/.test(p.fund));
+  const indicators = items.filter(p => /^(대학AID|대학혁신(?:지원사업)?)$/.test(p.fund))
+    .flatMap(p => indicatorsFor(p).filter(indicator => indicator.indicator)
+      .map(indicator => ({ ...p, ...indicator, id: p.id, name: p.name, year: p.year, fund: p.fund })));
   $("indicatorCount").textContent = "총 " + indicators.length + "개 항목";
   $("indicatorRows").innerHTML = indicators.map(p => `
     <tr><td>${esc(p.fund)}</td><td>${esc(p.indicatorCategory || "—")}</td>
@@ -136,8 +145,9 @@ function renderDashboardDetails(items, comparison) {
   $("partCompletion").innerHTML = parts.map(part => {
     const records = comparison.filter(p => p.part === part);
     const completed = records.filter(p => p.completion === "done").length;
-    const tracked = records.filter(p => p.target > 0);
-    const rates = tracked.reduce((total, p) => total + p.actual / p.target, 0);
+    const tracked = records.map(targetsFor).filter(targets => targets.length);
+    const rates = tracked.reduce((total, targets) =>
+      total + targets.reduce((subtotal, indicator) => subtotal + indicator.actual / indicator.target, 0) / targets.length, 0);
     return `<article class="comparison-card">
       <div class="barlabel"><strong>${part}</strong><span>완료 ${completed} / ${records.length}건</span></div>
       <div class="bars">
@@ -171,7 +181,7 @@ function render() {
   renderDashboardDetails(items, comparison);
   const budget = sum(items, "budget");
   const spent = sum(items, "spent");
-  const tracked = items.filter(p => p.target > 0);
+  const tracked = items.filter(p => targetsFor(p).length);
   const reached = tracked.filter(p => status(p) === "ok").length;
   const cards = [
     ["▤", "프로그램", number(items.length) + "개", new Set(items.map(p => p.fund)).size + "개 재원"],
@@ -186,14 +196,20 @@ function render() {
     `<div><div class="barlabel"><b>${esc(g.fund)}</b><span>${won(g.spent)} / ${won(g.budget)} · ${pct(g.spent, g.budget)}</span></div><div class="track"><div class="fill" style="width:${g.budget ? Math.min(100, g.spent / g.budget * 100) : 0}%"></div></div></div>`
   ).join("") || '<p class="empty">표시할 재원이 없습니다.</p>';
 
-  const pending = tracked.filter(p => status(p) === "pending").sort((a,b) => a.actual / a.target - b.actual / b.target);
+  const pending = tracked.filter(p => status(p) === "pending").sort((a,b) => lowestRate(a) - lowestRate(b));
   $("pendingCount").textContent = pending.length > 4 ? "전체 " + pending.length + "개 중 하위 4개" : pending.length + "개";
   $("pending").innerHTML = pending.slice(0, 4).map(p =>
-    `<button type="button" data-edit="${esc(p.id)}"><span>${esc(p.name)}</span><strong>${pct(p.actual, p.target)}</strong></button>`
+    `<button type="button" data-edit="${esc(p.id)}"><span>${esc(p.name)}</span><strong>${pct(lowestRate(p), 1)}</strong></button>`
   ).join("") || '<p class="empty">목표 미달 프로그램이 없습니다.</p>';
   $("count").textContent = "· " + items.length + "개";
   $("rows").innerHTML = items.map(p =>
-    `<tr><td><button class="edit" type="button" data-edit="${esc(p.id)}">${esc(p.name)}</button><br><small class="hint">${p.year}${p.owner ? " · " + esc(p.owner) : ""}${p.local ? " · 로컬" : ""}</small>${view === "programs" && !shared && !window.ctlSheetActive ? `<br><button type="button" class="edit hint" data-program-operations="${esc(p.id)}">운영 기록 열기</button>` : ""}</td><td>${esc(p.part || "미분류")}</td><td>${esc(p.lead || "미분류")}${p.org ? "<br><small class=hint>" + esc(p.org) + "</small>" : ""}</td><td>${esc(p.fund)}</td><td>${won(p.budget)}</td><td>${won(p.spent)}<br><small class="hint">잔액 ${won(p.budget - p.spent)}</small>${p.expenses?.length ? "<br><small class=hint>세부 " + p.expenses.length + "건</small>" : ""}</td><td>${pct(p.spent,p.budget)}</td><td>${p.indicator ? "<b>" + esc(p.indicator) + "</b><br>" : ""}<small class="hint" title="전년도 실적">${p.year - 1} 실적 ${p.priorActual == null ? "—" : number(p.priorActual) + " " + esc(p.unit)}</small><br>${p.year} 목표 ${number(p.target)} / 실적 ${number(p.actual)} ${esc(p.unit)}</td><td>${pct(p.actual,p.target)}</td><td><span class="status ${status(p)}">${labels[status(p)]}</span><br><small class="hint">운영 상태: ${completionLabels[completionStatus(p)]}</small></td><td class="hint">${operationDetails(p)}</td><td>${(p.teachers ?? []).map(t => esc(t.name) + " <small class=hint>(" + esc(teacherLabel(t.type)) + (t.affiliation ? " · " + esc(t.affiliation) : "") + ")</small>").join("<br>") || "—"}</td></tr>`
+    `<tr><td><button class="edit" type="button" data-edit="${esc(p.id)}">${esc(p.name)}</button><br><small class="hint">${p.year}${p.owner ? " · " + esc(p.owner) : ""}${p.local ? " · 로컬" : ""}</small>${view === "programs" && !shared && !window.ctlSheetActive ? `<br><button type="button" class="edit hint" data-program-operations="${esc(p.id)}">운영 기록 열기</button>` : ""}</td><td>${esc(p.part || "미분류")}</td><td>${esc(p.lead || "미분류")}${p.org ? "<br><small class=hint>" + esc(p.org) + "</small>" : ""}</td><td>${esc(p.fund)}</td><td>${won(p.budget)}</td><td>${won(p.spent)}<br><small class="hint">잔액 ${won(p.budget - p.spent)}</small>${p.expenses?.length ? "<br><small class=hint>세부 " + p.expenses.length + "건</small>" : ""}</td><td>${pct(p.spent,p.budget)}</td><td>${indicatorsFor(p).map((indicator, index) =>
+      "<div><b>" + esc(indicator.indicator || "지표 " + (index + 1)) + "</b><br><small class=hint>전년도 " +
+      (indicator.priorActual == null ? "—" : number(indicator.priorActual)) + "</small><br>목표 " +
+      number(indicator.target) + " / 실적 " + number(indicator.actual) + " " + esc(indicator.unit) + "</div>"
+    ).join("")}</td><td>${indicatorsFor(p).map((indicator, index) =>
+      "<div>" + (indicatorsFor(p).length > 1 ? esc(indicator.indicator || "지표 " + (index + 1)) + " · " : "") +
+      pct(indicator.actual, indicator.target) + "</div>").join("")}</td><td><span class="status ${status(p)}">${labels[status(p)]}</span><br><small class="hint">운영 상태: ${completionLabels[completionStatus(p)]}</small></td><td class="hint">${operationDetails(p)}</td><td>${(p.teachers ?? []).map(t => esc(t.name) + " <small class=hint>(" + esc(teacherLabel(t.type)) + (t.affiliation ? " · " + esc(t.affiliation) : "") + ")</small>").join("<br>") || "—"}</td></tr>`
   ).join("") || '<tr><td colspan="12">조건에 맞는 프로그램이 없습니다.</td></tr>';
   $("fundRows").innerHTML = groups(fundingPrograms()).map(g =>
     `<tr><td><button class="edit" data-fund="${esc(g.fund)}">${esc(g.fund)}</button></td><td>${g.items.length}개</td><td>${won(g.budget)}</td><td>${won(g.spent)}</td><td>${won(g.budget-g.spent)}</td><td>${pct(g.spent,g.budget)}</td><td>${g.reached} / ${g.tracked}개</td></tr>`
@@ -260,6 +276,21 @@ function addExpense(expense = {}) {
   return row;
 }
 $("expenseAdd").onclick = () => addExpense().querySelector(".expense-name").focus();
+function addIndicator(indicator = {}) {
+  const row = $("indicatorTemplate").content.firstElementChild.cloneNode(true);
+  for (const field of row.querySelectorAll("[data-indicator]")) {
+    field.value = indicator[field.dataset.indicator] ?? (field.dataset.indicator === "actual" ? 0 : "");
+  }
+  row.querySelector(".indicator-remove").onclick = () => {
+    row.remove();
+    $("indicatorAdd").disabled = false;
+    $("indicatorAdd").focus();
+  };
+  $("extraIndicators").append(row);
+  $("indicatorAdd").disabled = $("extraIndicators").childElementCount >= 15;
+  return row;
+}
+$("indicatorAdd").onclick = () => addIndicator().querySelector("input").focus();
 function openEdit(id) {
   if (window.ctlSheetProgram?.(id)) return;
   editing = programs.find(p => p.id === id);
@@ -267,6 +298,9 @@ function openEdit(id) {
   for (const input of $("form").querySelectorAll("[name]")) input.value = record[input.name] ?? "";
   $("form").elements.completion.value = completionStatus(record);
   updateOrganizationField();
+  $("extraIndicators").replaceChildren();
+  $("indicatorAdd").disabled = false;
+  for (const indicator of record.extraIndicators ?? []) addIndicator(indicator);
   $("expenses").replaceChildren();
   $("expenseAdd").disabled = false;
   for (const expense of record.expenses ?? []) addExpense(expense);
@@ -324,6 +358,7 @@ async function persist(record, deleted = false) {
     saving = false;
     buttons.forEach(button => { button.disabled = false; });
     $("teacherAdd").disabled = $("teachers").childElementCount >= 30;
+    $("indicatorAdd").disabled = $("extraIndicators").childElementCount >= 15;
     $("expenseAdd").disabled = $("expenses").childElementCount >= 30;
   }
 }
@@ -342,6 +377,18 @@ $("form").addEventListener("submit", async event => {
   }
   for (const field of operationFields) p[field] = p[field] === "" ? null : Number(p[field]);
   p.priorActual = p.priorActual === "" ? null : Number(p.priorActual);
+  p.extraIndicators = [...$("extraIndicators").children].map(row => {
+    const indicator = Object.fromEntries([...row.querySelectorAll("[data-indicator]")]
+      .map(field => [field.dataset.indicator, field.value.trim()]));
+    indicator.priorActual = indicator.priorActual === "" ? null : Number(indicator.priorActual);
+    indicator.target = Number(indicator.target);
+    indicator.actual = Number(indicator.actual);
+    return indicator;
+  });
+  if (p.extraIndicators.some(indicator => !indicator.indicator || !indicator.unit)) {
+    setFormError("추가 성과지표의 지표명과 단위를 입력하세요.");
+    return;
+  }
   p.expenses = [...$("expenses").children].map(row => ({
     name: row.querySelector(".expense-name").value.trim(),
     amount: Number(row.querySelector(".expense-amount").value)
@@ -419,11 +466,13 @@ function csvCell(value) {
   return '"' + raw.replaceAll('"','""') + '"';
 }
 $("export").onclick = () => {
-  const rows = [["사업연도","프로그램","파트","운영 유형","주관 학과·부서명","재원","담당자","편성액","집행액","잔액","집행률","목표값","실적값","단위","달성률","상태","신청인원(명)","신청 운영시간(시간)","이수인원(명)","실제 운영시간(시간)","운영교원·직원","운영 완료 여부","성과·자율지표명","지표 구분","세부요소 / 산출항목","전년도 실적","세부 지출 내역"]];
+  const rows = [["사업연도","프로그램","파트","운영 유형","주관 학과·부서명","재원","담당자","편성액","집행액","잔액","집행률","목표값","실적값","단위","달성률","상태","신청인원(명)","신청 운영시간(시간)","이수인원(명)","실제 운영시간(시간)","운영교원·직원","운영 완료 여부","성과·자율지표명","지표 구분","세부요소 / 산출항목","전년도 실적","세부 지출 내역","추가 성과지표"]];
   const items = view === "funding" ? fundingPrograms() : filteredPrograms();
   for (const p of items) rows.push([p.year,p.name,p.part,p.lead,p.org,p.fund,p.owner,p.budget,p.spent,p.budget-p.spent,pct(p.spent,p.budget),p.target,p.actual,p.unit,pct(p.actual,p.target),labels[status(p)],...operationFields.map(field => p[field] ?? ""),
     (p.teachers ?? []).map(t => t.name + " (" + teacherLabel(t.type) + (t.affiliation ? " · " + affiliationLabel(t.type) + " " + t.affiliation : "") + ")").join(" / "), completionLabels[completionStatus(p)], p.indicator ?? "", p.indicatorCategory ?? "", p.indicatorDetail ?? "", p.priorActual ?? "",
-    (p.expenses ?? []).map(e => e.name + " (" + e.amount + "원)").join(" / ")]);
+    (p.expenses ?? []).map(e => e.name + " (" + e.amount + "원)").join(" / "),
+    (p.extraIndicators ?? []).map(i => i.indicator + " · " + i.unit + " · 전년도 " + (i.priorActual ?? "—") +
+      " · 목표 " + i.target + " · 실적 " + i.actual + " · " + pct(i.actual, i.target)).join("\n")]);
   const file = new Blob(["\uFEFF" + rows.map(row => row.map(csvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(file);
   const link = document.createElement("a");

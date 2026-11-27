@@ -106,3 +106,6 @@ dialog::backdrop { background: #102e2990; }
 .comparison-card .bars > div:nth-child(2) .fill { background: #42975b; }
 .comparison-card .bars > div:nth-child(3) .fill { background: #346d9b; }
 @media(max-width: 850px) { .comparison-grid { grid-template-columns: 1fr; } }
+
+.extra-indicator { margin: 0 0 10px; padding: 12px; }
+.extra-indicator .fields { margin: 0 0 8px; }
