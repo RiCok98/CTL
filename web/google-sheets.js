@@ -79,9 +79,13 @@
       const parent = tabs.find(tab => tab.title === title);
       const [headers, ...rows] = range.values ?? [];
       const compact = headers?.[3] === "프로그램코드" && headers?.[10] === "상세 탭 이름";
+      const simple = headers?.[3] === "예산 (원)" && headers?.[8] === "목표" && headers?.[9] === "실적";
       return rows.flatMap((source, index) => {
         let r = source;
-        if (compact) {
+        if (simple) {
+          r = Array(27).fill("");
+          for (const [original, basic] of [[0,0],[1,1],[2,2],[7,3],[8,4],[20,7],[22,8],[23,9]]) r[original] = source[basic] ?? "";
+        } else if (compact) {
           r = Array(27).fill("");
           for (const [original, summary] of [[0,0],[1,1],[2,2],[3,4],[6,5],[7,6],[8,7],[22,11],[23,12],[26,10]]) {
             r[original] = source[summary] ?? "";
@@ -249,7 +253,7 @@
     byId("sheetsExpenseForm").hidden = !active.room;
     byId("sheetsExpenseForm").reset();
     displayExpenses();
-    message("sheetsProgramStatus", active.room ? "" : "구글 시트에서 프로그램 상세 탭을 만들면 여기에서 지출을 추가할 수 있습니다.");
+    message("sheetsProgramStatus", active.room ? "" : "이 프로그램의 예산과 실적은 구글 시트에서 수정할 수 있습니다.");
     byId("sheetsProgram").showModal();
     getExpenses(active).catch(error => message("sheetsProgramStatus", error.message));
     return true;
