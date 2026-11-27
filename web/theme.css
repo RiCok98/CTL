@@ -116,3 +116,9 @@ textarea:focus-visible { outline: 2px solid #28866b; outline-offset: 2px; }
 .operation-kinds { margin: 0; }
 .operation-kinds label { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; }
 .operation-kinds input { margin: 0; accent-color: var(--green); }
+
+.operation-faculty-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+@media (max-width: 450px) {
+  .operation-faculty-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .operation-faculty-remove { grid-column: 2; justify-self: end; }
+}

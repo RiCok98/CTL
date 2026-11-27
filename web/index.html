@@ -40,10 +40,20 @@
 <div class="fields">
 <label class="wide">프로그램<select id="operationEntryProgram" required></select></label>
 <label id="operationDepartment" class="wide" hidden>학과명<input name="department" maxlength="80" disabled></label>
-<label id="operationFaculty" hidden>운영교수<input name="faculty" maxlength="80" disabled></label>
-<label id="operationFacultyType" hidden>교원 유형<select name="facultyType" disabled>
+<fieldset id="operationFacultyGroup" class="wide detail-section" hidden disabled>
+<legend>운영교원</legend>
+<div id="operationFacultyRows"></div>
+<button class="secondary" type="button" id="operationFacultyAdd">＋ 운영교원 추가</button>
+</fieldset>
+<template id="operationFacultyTemplate">
+<div class="teacher-row operation-faculty-row">
+<label>운영교원 이름<input class="operation-faculty-name" maxlength="80" required></label>
+<label>교원 유형<select class="operation-faculty-type" required>
 <option value="">선택</option><optgroup label="전담전임교원"><option>산학전담</option><option>강의전담</option><option>교육전담</option></optgroup><option>일반전임교원</option>
 </select></label>
+<button class="secondary danger operation-faculty-remove" type="button">삭제</button>
+</div>
+</template>
 <fieldset class="wide detail-section operation-kinds"><legend>기록 유형</legend>
 <div class="actions">
 <label><input type="checkbox" name="kind" value="expense" checked>지출</label>

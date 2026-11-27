@@ -529,6 +529,9 @@ function downloadCsv(rows, filename) {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+function operationFaculty(record) {
+  return record.facultyMembers ?? (record.faculty ? [{ name: record.faculty, type: record.facultyType }] : []);
+}
 function operationCsvRows() {
   const rows = [["사업연도", "파트", "프로그램", "날짜", "유형", "항목·회차", "지출액(원)", "이수인원(명)", "이수·운영시간(시간)", "신청인원(명)", "신청 운영시간(시간)", "성과지표", "단위", "추가 달성값", "학과명", "운영교수", "교원 유형"]];
   for (const program of operatingPrograms()) {
@@ -537,7 +540,8 @@ function operationCsvRows() {
       rows.push([program.year, program.part, program.name, record.date, operationKinds(record).map(operationTypeLabel).join(" · "),
         record.label, expense ? record.amount : "", record.people ?? "", record.hours ?? "",
         record.applicants ?? "", record.requestedHours ?? "", record.indicatorName ?? "", record.unit ?? "", record.value ?? "",
-        record.department ?? "", record.faculty ?? "", record.facultyType ? teacherLabel(record.facultyType) : ""]);
+        record.department ?? "", operationFaculty(record).map(member => member.name).join(" / "),
+        operationFaculty(record).map(member => member.type ? teacherLabel(member.type) : "—").join(" / ")]);
     }
   }
   return rows;
@@ -617,7 +621,8 @@ function renderOperations() {
   const records = local ? operationRecords.filter(record => names.has(record.programId)).slice().reverse() : [];
   $("operationRows").innerHTML = records.map(record => `
     <tr><td>${esc(names.get(record.programId))}</td><td>${esc(record.date)}</td><td>${operationKinds(record).map(operationTypeLabel).join(" · ")}</td>
-    <td>${esc(record.label)}</td><td>${[record.department, record.faculty, record.facultyType ? teacherLabel(record.facultyType) : ""].filter(Boolean).map(esc).join(" · ") || "—"}</td><td>${hasOperation(record, "expense") ? won(record.amount) : "—"}</td>
+    <td>${esc(record.label)}</td><td>${[record.department, ...operationFaculty(record).map(member =>
+      member.name + (member.type ? " (" + teacherLabel(member.type) + ")" : ""))].filter(Boolean).map(esc).join("<br>") || "—"}</td><td>${hasOperation(record, "expense") ? won(record.amount) : "—"}</td>
     <td>${hasOperation(record, "session") ? number(record.people) + "명" : "—"}</td>
     <td>${hasOperation(record, "session") ? number(record.hours) + "시간" : "—"}</td>
     <td>${[
@@ -634,6 +639,7 @@ function openOperationEntry() {
     return;
   }
   $("operationForm").reset();
+  $("operationFacultyRows").replaceChildren();
   const select = $("operationEntryProgram");
   select.replaceChildren(new Option("프로그램 선택", ""), ...programs.map(programOption));
   const filtered = operatingPrograms();
@@ -645,10 +651,10 @@ function openOperationEntry() {
 function updateOperationEntry() {
   const program = programs.find(item => item.id === $("operationEntryProgram").value);
   const academic = program?.lead === "학과주도";
-  for (const id of ["operationDepartment", "operationFaculty", "operationFacultyType"]) {
-    $(id).hidden = !academic;
-    $(id).querySelector("input, select").disabled = !academic;
-  }
+  $("operationDepartment").hidden = !academic;
+  $("operationDepartment").querySelector("input").disabled = !academic;
+  $("operationFacultyGroup").hidden = !academic;
+  $("operationFacultyGroup").disabled = !academic;
   $("operationDepartment").querySelector("input").required = academic;
   const select = $("operationIndicator");
   select.replaceChildren(...(program ? [
@@ -658,6 +664,15 @@ function updateOperationEntry() {
   ] : []));
   setOperationFields();
 }
+$("operationFacultyAdd").onclick = () => {
+  const row = $("operationFacultyTemplate").content.firstElementChild.cloneNode(true);
+  row.querySelector(".operation-faculty-remove").onclick = () => {
+    row.remove();
+    $("operationFacultyAdd").focus();
+  };
+  $("operationFacultyRows").append(row);
+  row.querySelector("input").focus();
+};
 $("operationClose").onclick = () => $("operationDialog").close();
 $("operationEntryProgram").addEventListener("change", updateOperationEntry);
 $("operationSummary").addEventListener("click", event => {
@@ -733,14 +748,17 @@ $("operationForm").addEventListener("submit", event => {
     Object.assign(details, { indicatorId: selected, indicatorName: indicator.indicator || "기본 성과지표", unit: indicator.unit, value });
   }
   const department = String(data.get("department") ?? "").trim();
-  const faculty = String(data.get("faculty") ?? "").trim();
-  const facultyType = String(data.get("facultyType") ?? "");
-  if (program.lead === "학과주도" && (!department || Boolean(faculty) !== Boolean(facultyType))) {
-    $("operationError").textContent = "학과명을 입력하세요. 운영교수를 기록할 때는 이름과 교원 유형을 함께 입력하세요.";
+  const academic = program.lead === "학과주도";
+  const facultyMembers = academic ? [...$("operationFacultyRows").children].map(row => ({
+    name: row.querySelector(".operation-faculty-name").value.trim(),
+    type: row.querySelector(".operation-faculty-type").value
+  })) : [];
+  if (academic && (!department || facultyMembers.some(member => !member.name || !member.type))) {
+    $("operationError").textContent = "학과명을 입력하고, 추가한 운영교원마다 이름과 유형을 입력하세요.";
     return;
   }
   const record = { id: crypto.randomUUID(), programId, kinds, date, label, ...details,
-    ...(program.lead === "학과주도" ? { department, faculty, facultyType } : {}) };
+    ...(academic ? { department, facultyMembers } : {}) };
   if (saveOperations(records => [...records, record])) {
     $("operationDialog").close();
     $("operationNotice").textContent = "기록을 추가했습니다. 프로그램 관리에도 누적 반영됩니다.";
