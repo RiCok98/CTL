@@ -3,12 +3,24 @@ const parts = ["교원파트", "학습파트", "원격파트"];
 const leads = ["학과주도", "부서주도", "기타"];
 const textLimits = { name: 100, fund: 60, unit: 20, owner: 80, org: 80 };
 const maxNumbers = { budget: 999999999999, spent: 999999999999, target: 999999999, actual: 999999999 };
+const counts = ["applicants", "completions"];
+const hours = ["requestedHours", "operatingHours"];
+const teacherTypes = ["산학전담", "강의전담", "교육전담", "일반전임교원"];
 const required = ["name", "fund", "unit", "owner"];
 
 function json(data, status = 200) {
   return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 }
 
+function validateOperations(record) {
+  return counts.every(field => record[field] == null ||
+    (Number.isInteger(record[field]) && record[field] >= 0 && record[field] <= 999999999)) &&
+    hours.every(field => record[field] == null ||
+      (Number.isFinite(record[field]) && record[field] >= 0 && record[field] <= 999999)) &&
+    (record.teachers === undefined || (Array.isArray(record.teachers) && record.teachers.length <= 30 &&
+      record.teachers.every(teacher => teacher && typeof teacher.name === "string" &&
+        teacher.name.trim().length > 0 && teacher.name.trim().length <= 80 && teacherTypes.includes(teacher.type))));
+}
 function validate(record) {
   if (!record || !parts.includes(record.part) || !leads.includes(record.lead) ||
       !Number.isInteger(record.year) || record.year < 1900 || record.year > 9999) return false;
@@ -17,7 +29,7 @@ function validate(record) {
     (!required.includes(field) || record[field].trim().length > 0)) &&
     Object.entries(maxNumbers).every(([field, max]) =>
       Number.isFinite(record[field]) && record[field] >= 0 && record[field] <= max) &&
-    Number.isInteger(record.budget) && Number.isInteger(record.spent);
+    Number.isInteger(record.budget) && Number.isInteger(record.spent) && validateOperations(record);
 }
 
 export async function api(request, env, path) {
@@ -70,9 +82,12 @@ export async function api(request, env, path) {
     let input;
     try { input = JSON.parse(body); } catch { return json({ error: "입력 형식이 올바르지 않습니다." }, 400); }
     if (!validate(input)) return json({ error: "파트, 운영 유형, 담당자와 프로그램 항목을 확인하세요." }, 400);
+    if (input.lead === "학과주도" && !input.org.trim()) return json({ error: "주관 학과명을 입력하세요." }, 400);
     record = { id, part: input.part, lead: input.lead, year: input.year, updatedAt: new Date().toISOString() };
     for (const field of Object.keys(textLimits)) record[field] = input[field].trim();
     for (const field of Object.keys(maxNumbers)) record[field] = input[field];
+    for (const field of [...counts, ...hours]) record[field] = input[field] ?? null;
+    record.teachers = (input.teachers ?? []).map(({ name, type }) => ({ name: name.trim(), type }));
   }
   const stored = await env.BUCKET.put(key, JSON.stringify(record ?? { id }), {
     onlyIf: creating ? { etagDoesNotMatch: "*" } : { etagMatches: version },

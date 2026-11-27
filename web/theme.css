@@ -71,3 +71,24 @@ dialog::backdrop { background: #102e2990; }
   dialog { max-height: 92dvh; }
   dialog input, dialog select { font-size: 16px; }
 }
+
+.detail-section {
+  min-width: 0;
+  margin: 0 0 15px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.detail-section legend { padding: 0 6px; font-weight: 700; }
+.detail-section .fields { margin: 0; }
+.teacher-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+@media(max-width: 450px) {
+  .teacher-row { grid-template-columns: 1fr 1fr; }
+  .teacher-remove { grid-column: 2; justify-self: end; }
+}
