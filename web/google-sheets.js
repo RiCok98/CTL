@@ -49,6 +49,12 @@
         ? "연결한 Google 계정으로 이 시트를 직접 열 수 있는지 확인하세요. 열 수 있다면 Google Cloud 프로젝트의 Sheets API 사용 설정도 확인하세요."
         : "시트 또는 지출 범위를 편집할 권한이 없습니다. 같은 Google 계정의 편집 권한과 범위 보호 설정을 확인하세요.");
     }
+    if (response.status === 400) {
+      const payload = await response.json().catch(() => ({}));
+      const detail = String(payload.error?.message ?? "");
+      if (/range|grid/i.test(detail)) throw new Error("Google 시트의 탭 이름이나 읽기 범위를 확인하세요. " + detail);
+      throw new Error("Google 시트 요청을 처리하지 못했습니다 (400). " + detail);
+    }
     if (!response.ok) throw new Error("Google 시트 요청이 실패했습니다 (" + response.status + ").");
     return response.json();
   }
@@ -98,19 +104,36 @@
     loading = true;
     message("sheetsStatus", "구글 시트에서 불러오는 중…");
     try {
+      const tabs = await googleApi("", {
+        fields: "sheets(properties(sheetId,title,gridProperties(rowCount,columnCount)))"
+      });
+      const partTabs = tabNames.map(name => {
+        const properties = tabs.sheets.find(sheet => sheet.properties.title === name)?.properties;
+        if (!properties) throw new Error(name + " 탭을 찾을 수 없습니다. 스프레드시트 주소와 탭 이름을 확인하세요.");
+        return properties;
+      });
       const rangeQuery = new URLSearchParams({ valueRenderOption: "UNFORMATTED_VALUE" });
       const metadataQuery = new URLSearchParams({
-        fields: "sheets(properties(sheetId,title),data(startRow,rowData(values(hyperlink,textFormatRuns))))"
+        fields: "sheets(properties(sheetId),data(startRow,rowData(values(hyperlink,textFormatRuns))))"
       });
-      for (const name of tabNames) {
-        rangeQuery.append("ranges", quoteTab(name) + "!A5:AA503");
-        metadataQuery.append("ranges", quoteTab(name) + "!AA5:AA503");
+      const readableParts = [];
+      for (const tab of partTabs) {
+        const { rowCount, columnCount } = tab.gridProperties;
+        if (rowCount < 5 || columnCount < 2) continue;
+        const endRow = Math.min(503, rowCount);
+        const endColumn = columnCount >= 27 ? "AA" : String.fromCharCode(64 + columnCount);
+        readableParts.push(tab.title);
+        rangeQuery.append("ranges", quoteTab(tab.title) + "!A5:" + endColumn + endRow);
+        if (columnCount >= 27) {
+          metadataQuery.append("ranges", quoteTab(tab.title) + "!AA5:AA" + endRow);
+        }
       }
-      const [values, tabs, metadata] = await Promise.all([
-        googleApi("/values:batchGet", rangeQuery),
-        googleApi("", { fields: "sheets(properties(sheetId,title))" }),
-        googleApi("", metadataQuery)
+      const [values, metadata] = await Promise.all([
+        readableParts.length ? googleApi("/values:batchGet", rangeQuery) : { valueRanges: [] },
+        metadataQuery.has("ranges") ? googleApi("", metadataQuery) : { sheets: [] }
       ]);
+      const rangesByPart = new Map(readableParts.map((name, index) => [name, values.valueRanges[index]]));
+      values.valueRanges = tabNames.map(name => rangesByPart.get(name) ?? {});
       const partsMetadata = new Map(metadata.sheets.map(sheet => [sheet.properties.sheetId, sheet.data]));
       tabs.sheets.forEach(sheet => { sheet.data = partsMetadata.get(sheet.properties.sheetId); });
       records = parseRows(tabs, values);
