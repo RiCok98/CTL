@@ -1,19 +1,143 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank">
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f4f7f5;color:#18352d;font:14px system-ui,sans-serif}main{max-width:1180px;margin:auto;padding:24px 16px}h1{margin:0 0 18px;font-size:clamp(22px,4vw,32px)}h2{font-size:18px;margin:0 0 12px}.row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}label{display:grid;gap:5px}select,button,a.action{font:inherit;padding:8px 10px;border:1px solid #cbded3;border-radius:8px;background:white;color:#144334}button,a{cursor:pointer}.panel,.card{background:white;border:1px solid #dce7df;border-radius:14px;padding:16px;margin-top:14px}.hero{background:#123d35;color:white}.big{font-size:34px;font-weight:750;margin-top:5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}.card strong{display:block;font-size:22px;margin-top:6px}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;white-space:nowrap}th,td{text-align:left;padding:9px;border-bottom:1px solid #e7eee9}th{background:#edf5ef}a{color:#14684e}progress{width:100%;accent-color:#2c946d}.hero progress{accent-color:#a5e2b5}.area{min-width:150px;flex:1}#message{margin:12px 0}
-</style></head><body><main>
-<h1>CTL 교수학습혁신센터 예산·성과 대시보드</h1>
-<div class="panel row">
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap');
+*{box-sizing:border-box}body{margin:0;background:#f6f8fc;color:#18243b;font:14px Inter,'Noto Sans KR',sans-serif}button,input,select{font:inherit}button,select{cursor:pointer}button{border:0}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #8b87ff;outline-offset:2px}.shell{display:grid;grid-template-columns:228px minmax(0,1fr);min-height:100vh}aside{background:#17223b;color:#bbc6dc;padding:30px 20px;display:flex;flex-direction:column;gap:38px}.brand{display:flex;align-items:center;gap:12px;color:white;font-size:21px;font-weight:800}.logo{background:#7770ff;padding:9px;border-radius:11px;font-size:17px}.brand small{display:block;color:#aeb9d2;font-size:10px;margin-top:4px;font-weight:600;letter-spacing:.12em}nav{display:grid;gap:6px}nav button{background:transparent;text-align:left;color:#bec9df;padding:12px;border-radius:8px}nav button[aria-pressed=true]{background:#303858;color:white}nav span{display:inline-block;width:28px;color:#a49fff}aside footer{margin-top:auto;border-top:1px solid #354059;padding-top:18px;font-size:12px}.top{background:#fff;border-bottom:1px solid #e5eaf3;padding:16px 30px;display:flex;justify-content:space-between;align-items:center;color:#59667e}.pill{background:#eeebff;color:#5146c5;padding:6px 10px;border-radius:20px;font-size:11px;font-weight:700}.content{max-width:1450px;margin:auto;padding:28px 30px 40px}.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}h1{font-size:31px;margin:0 0 7px;letter-spacing:-.055em}h2{font-size:17px;margin:0;letter-spacing:-.035em}p{margin:0;color:#626f85}.primary{background:#554be2;color:white;padding:11px 16px;border-radius:8px;font-weight:700}.secondary{background:#fff;border:1px solid #dce3f0;border-radius:8px;padding:9px 12px;color:#35445d}.actions,.filters{display:flex;gap:8px;flex-wrap:wrap}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:23px 0 16px}.card,.panel{background:#fff;border:1px solid #e3e8f2;border-radius:13px}.card{padding:17px}.card strong{display:block;font-size:27px;margin:9px 0 5px;letter-spacing:-.055em}.card small,.hint{color:#65738b;font-size:12px}.symbol{display:inline-block;background:#efedff;color:#5146c5;border-radius:8px;padding:6px 9px;margin-bottom:8px;font-weight:800}.grid{display:grid;grid-template-columns:1.25fr 1fr;gap:15px;margin-bottom:16px}.panel{padding:18px}.panel .row{margin-bottom:14px}.bars{display:grid;gap:12px}.barlabel{display:flex;justify-content:space-between;gap:10px;margin-bottom:5px;font-size:12px}.track{height:8px;background:#edf0f7;border-radius:8px;overflow:hidden}.fill{height:100%;background:#6458ed;border-radius:8px}.goal .fill{background:#229a83}.attention{display:grid;gap:8px}.attention button{display:flex;justify-content:space-between;gap:12px;text-align:left;background:#f7f8fc;color:#283853;border-radius:8px;padding:10px 12px}.attention strong{color:#a14d13;white-space:nowrap}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;white-space:nowrap}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid #edf0f7}th{background:#f5f7fc;color:#5c6981;font-size:12px}tbody tr:last-child td{border:0}.edit{background:transparent;color:#4f46ce;font-weight:700;text-align:left;padding:0}.status{display:inline-block;padding:4px 8px;border-radius:12px;background:#fff1e4;color:#963f0c;font-size:11px;font-weight:700}.status.ok{background:#e5f7ef;color:#157453}.status.neutral{background:#edf0f7;color:#515d73}input,select{background:#fff;border:1px solid #dce3ef;border-radius:8px;padding:9px;color:#273750;min-width:0}dialog{padding:22px;border:1px solid #e0e6f2;border-radius:15px;width:min(580px,94vw);color:#18243b}dialog::backdrop{background:#18243b88}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:15px 0}label{display:grid;gap:5px;font-size:12px;font-weight:700}.wide{grid-column:1/-1}.danger{color:#a33141}.empty{padding:16px 0}.notice{color:#9b3a20;margin-top:10px}.hidden,[hidden]{display:none!important}@media(max-width:1000px){.shell{grid-template-columns:166px minmax(0,1fr)}aside{padding:24px 13px}.content,.top{padding-left:19px;padding-right:19px}.stats{grid-template-columns:repeat(2,1fr)}}@media(max-width:690px){.shell{display:block}aside{padding:14px;gap:12px}nav{display:flex;flex-wrap:wrap}nav button{padding:7px 9px}nav span{width:19px}aside footer{display:none}.top{padding-top:9px;padding-bottom:9px}.content{padding-top:19px}.grid{grid-template-columns:1fr}.stats{gap:8px}.card{padding:12px}h1{font-size:25px}.card strong{font-size:22px}}
+
+:root {
+  --ink: #162d27;
+  --muted: #536961;
+  --forest: #123d35;
+  --green: #176650;
+  --surface: #fff;
+  --line: #dce7e0;
+  --mint: #eaf4ec;
+  --canvas: #f4f7f5;
+}
+body { background: var(--canvas); color: var(--ink); }
+.shell { grid-template-columns: 220px minmax(0, 1fr); }
+aside { background: #102e29; color: #c0d6cd; padding: 28px 16px; gap: 36px; }
+.brand { gap: 10px; font-size: 19px; letter-spacing: -.04em; }
+.brand small { color: #b8d4c8; letter-spacing: .04em; font-size: 11px; }
+.logo { display: block; background: none; padding: 0; border-radius: 12px; }
+nav button { color: #cce0d7; font-weight: 600; }
+nav button[aria-pressed=true] { background: #235447; color: #fff; }
+nav button:hover { background: #1a4238; }
+nav span { color: #a5e2b5; }
+aside footer { border-color: #31534a; color: #c0d6cd; }
+.top { min-height: 68px; background: var(--surface); color: var(--muted); border-color: var(--line); }
+.top-actions { display: flex; align-items: center; gap: 8px; }
+.pill { color: #235443; background: var(--mint); white-space: nowrap; }
+.content { padding-top: 25px; }
+.page-heading { padding: 25px; border-radius: 16px; background: linear-gradient(108deg,#e3f0e7,#f9fbf7); border: 1px solid var(--line); }
+h1 { font-size: clamp(25px, 3vw, 38px); }
+h2 { font-size: 18px; }
+p, .hint, .card small { color: var(--muted); }
+.primary { background: var(--green); }
+.primary:hover { background: var(--forest); }
+.secondary { border-color: #cfddd5; color: #264b3f; }
+.secondary:hover { background: #f1f7f2; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline-color: #28866b; }
+button:disabled { opacity: .55; cursor: wait; }
+.card, .panel { border-color: var(--line); border-radius: 15px; box-shadow: 0 2px 6px #15382b06; }
+.card { padding: 17px; }
+.card strong { font-size: clamp(20px, 2vw, 29px); overflow-wrap: anywhere; }
+.symbol { background: var(--mint); color: #205941; }
+.track { height: 9px; background: #e7efea; }
+.fill { background: #277b5d; }
+.attention button { background: #f3f7f4; color: var(--ink); }
+th { background: #eef4ef; color: #41594f; }
+th, td { border-color: #ecf0ed; }
+.edit { color: #156147; }
+input, select, dialog { border-color: #d3e0d8; color: var(--ink); }
+dialog::backdrop { background: #102e2990; }
+.install-info { display: flex; align-items: flex-start; gap: 16px; margin-top: 16px; }
+.install-info p + p { margin-top: 10px; }
+@media(max-width: 1000px) { .shell { grid-template-columns: 174px minmax(0, 1fr); } }
+@media(max-width: 690px) {
+  aside { padding: 13px 14px 9px; gap: 9px; }
+  .brand { font-size: 18px; }
+  .logo { height: 40px; width: 40px; }
+  nav { gap: 4px; }
+  nav button { min-height: 42px; padding: 7px 10px; }
+  .top { min-height: 52px; gap: 7px; padding-inline: 12px; font-size: 11px; }
+  .top-actions { gap: 4px; }
+  .top .secondary { padding: 7px 8px; white-space: nowrap; }
+  .content { padding: 14px 12px calc(24px + env(safe-area-inset-bottom)); }
+  .page-heading { padding: 16px; gap: 14px; }
+  .page-heading .actions { width: 100%; }
+  .page-heading .actions button { flex: 1 1 auto; min-height: 44px; padding-inline: 9px; }
+  .stats { margin: 15px 0 12px; }
+  .card { padding: 12px; }
+  .panel { padding: 13px; }
+  .filters { width: 100%; }
+  .filters > * { flex: 1 1 120px; max-width: 100%; min-height: 42px; }
+  .tablewrap { border: 1px solid var(--line); border-radius: 9px; }
+  th, td { padding: 10px 8px; }
+  dialog { max-height: 92dvh; }
+  dialog input, dialog select { font-size: 16px; }
+}
+
+.detail-section {
+  min-width: 0;
+  margin: 0 0 15px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.detail-section legend { padding: 0 6px; font-weight: 700; }
+.detail-section .fields { margin: 0; }
+.teacher-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+@media(max-width: 450px) {
+  .teacher-row { grid-template-columns: 1fr 1fr; }
+  .teacher-remove { grid-column: 2; justify-self: end; }
+}
+
+.expense-row { grid-template-columns: 1fr 1fr auto; }
+@media(max-width: 450px) {
+  .expense-row { grid-template-columns: 1fr 1fr; }
+  .expense-remove { grid-column: 2; justify-self: end; }
+}
+
+#dashboardDetails { display: grid; gap: 16px; margin-top: 16px; }
+.comparison-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.comparison-card { padding: 14px; background: var(--canvas); border: 1px solid var(--line); border-radius: 10px; }
+.comparison-card > .barlabel { margin-bottom: 12px; }
+.comparison-card .bars > div:nth-child(2) .fill { background: #42975b; }
+.comparison-card .bars > div:nth-child(3) .fill { background: #346d9b; }
+@media(max-width: 850px) { .comparison-grid { grid-template-columns: 1fr; } }
+
+
+html{scroll-behavior:smooth}.top{text-align:left}.aside-links{display:grid;gap:7px}.aside-links a{color:#dcebe1;text-decoration:none;border-radius:8px;padding:10px 12px}.aside-links a:first-child,.aside-links a:hover{background:#235447;color:white}.dash-filters{margin-top:16px}.dash-filters label{min-width:120px}.dash-filters select{width:100%}.sheet-link{text-decoration:none;display:inline-block}.dashboard-metrics{margin-bottom:16px}.dashboard-metrics strong{overflow-wrap:anywhere}.dashboard-panel+.dashboard-panel{margin-top:16px}.comparison-grid article .bars{margin-top:12px}.dashboard-message:not(:empty){background:#fff3e4;color:#713711;border:1px solid #ecd7bd;border-radius:8px;padding:10px 12px;margin-top:12px}.group-tag{font-size:11px;font-weight:700;color:#176650;background:#eaf4ec;padding:4px 8px;border-radius:20px}
+@media(max-width:690px){.aside-links{display:flex;gap:3px;flex-wrap:wrap}.aside-links a{padding:8px}.dash-filters label{flex:1}.dash-filters .actions{flex:1 1 100%}.dashboard-metrics{margin-bottom:12px}}
+</style></head><body><div class="shell" id="top">
+<aside><div class="brand"><svg class="logo" width="46" height="46" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="CTL">
+  <rect width="128" height="128" rx="28" fill="#123d35"/>
+  <path d="M64 57C57 49 45 45 31 45v28c14 0 26 4 33 12 7-8 19-12 33-12V45c-14 0-26 4-33 12Z" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M64 57v28m0-36V28m-7 7 7-7 7 7" fill="none" stroke="#a5e2b5" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="64" y="105" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" letter-spacing="3" fill="#fff">CTL</text>
+</svg>
+<div>CTL 운영관리<small>교수학습혁신센터</small></div></div>
+<nav class="aside-links" aria-label="대시보드 메뉴"><a href="#top" target="_self">▦ 대시보드</a><a href="#programPanel" target="_self">▤ 프로그램 현황</a><a href="#indicatorPanel" target="_self">◎ 자율성과지표</a></nav>
+<footer>Google 스프레드시트 연동</footer></aside>
+<main><header class="top"><span>운영관리 / 대시보드</span><span class="pill">조회 전용</span></header>
+<div class="content">
+<div class="row page-heading"><div><h1>CTL 운영 대시보드</h1><p>재원별 예산 집행과 프로그램 성과를 확인하세요.</p></div><div class="actions"><button class="secondary" id="reload" type="button">새로고침</button><a class="primary sheet-link" id="sheet" hidden rel="noopener">구글 시트 열기</a></div></div>
+<p class="dashboard-message" id="message" role="status"></p>
+<div class="panel dash-filters"><div class="filters">
 <label>사업연도<select id="year"></select></label><label>사업재원<select id="fund"></select></label>
-<label>파트<select id="part"></select></label><label>완료 여부<select id="status"></select></label>
-<button id="reload" type="button">새로고침</button><a class="action" id="sheet" hidden>구글 시트 열기</a>
-</div>
-<p id="message" role="status"></p>
-<section class="panel hero"><h2>예산 집행률</h2><div class="big" id="rate">—</div><div id="areas" class="row"></div></section>
-<div class="cards" id="cards"></div>
-<section class="panel"><h2>프로그램별 예산·성과</h2><div class="scroll"><table id="programs"></table></div></section>
-<section class="panel"><h2>자율성과지표 관리 · 대학AID·대학혁신</h2><div class="scroll"><table id="indicators"></table></div></section>
+<label>파트<select id="part"></select></label><label>완료 여부<select id="status"></select></label></div></div>
+<div class="stats dashboard-metrics" id="cards"></div>
+<section class="panel dashboard-panel"><div class="row"><h2>파트별 집행·완료 현황</h2><span class="hint">전체 예산 집행률 <strong id="rate">—</strong></span></div><div id="areas" class="comparison-grid"></div></section>
+<section class="panel dashboard-panel" id="programPanel"><div class="row"><h2>프로그램별 예산·성과</h2></div><div class="tablewrap"><table id="programs"></table></div></section>
+<section class="panel dashboard-panel" id="indicatorPanel"><div class="row"><h2>자율성과지표 관리</h2><span class="group-tag">대학AID · 대학혁신</span></div><div class="tablewrap"><table id="indicators"></table></div></section>
+</div></main></div>
 <script>
 const el=id=>document.getElementById(id);
 const parts=['교수파트','학습파트','원격파트'];
@@ -21,6 +145,7 @@ const funds=['대학혁신','대학AID','대학앵커','대학교비'];
 const money=n=>n.toLocaleString('ko-KR')+'원';
 const pct=(n,d)=>n==null||!d?'—':(100*n/d).toFixed(1)+'%';
 let programs=[];
+let loaded=false;
 function options(id,values,label){
   const select=el(id),previous=select.value;
   select.replaceChildren(new Option(label,''), ...[...new Set(values.filter(Boolean))].map(value=>new Option(value,value)));
@@ -43,14 +168,25 @@ function render(){
   const budget=sum(rows,'budget'),spent=sum(rows,'spent');
   el('rate').textContent=pct(spent,budget);
   el('areas').replaceChildren(...parts.map(part=>{
-    const list=filtered.filter(p=>p.part===part), card=document.createElement('div');card.className='area';
+    const list=filtered.filter(p=>p.part===part), card=document.createElement('article');card.className='comparison-card';
     const complete=list.filter(p=>p.status==='완료 (O)').length,b=sum(list,'budget'),s=sum(list,'spent');
-    const caption=document.createElement('p');caption.textContent=part+' · 완료 '+complete+'/'+list.length+'건 · 집행 '+pct(s,b);
-    const bar=document.createElement('progress');bar.max=1;bar.value=b?Math.max(0,Math.min(1,s/b)):0;
-    bar.setAttribute('aria-label',part+' 예산 집행률');card.append(caption,bar);return card
+    const caption=document.createElement('div');caption.className='barlabel';
+    const title=document.createElement('strong');title.textContent=part;
+    caption.append(title, '완료 '+complete+' / '+list.length+'건');
+    const bars=document.createElement('div');bars.className='bars';
+    const measured=list.filter(p=>p.target>0&&p.actual!=null);
+    const totalRatio=measured.reduce((total,p)=>total+p.actual/p.target,0);
+    for(const [label,num,den] of [['예산 집행률',s,b],['프로그램 완료율',complete,list.length],['목표 대비 평균',totalRatio,measured.length]]){
+      const item=document.createElement('div'), heading=document.createElement('div'),track=document.createElement('div'),fill=document.createElement('div');
+      heading.className='barlabel';heading.append(label,pct(num,den));track.className='track';fill.className='fill';
+      fill.style.width=(den?Math.max(0,Math.min(100,100*num/den)):0)+'%';
+      track.append(fill);item.append(heading,track);bars.append(item);
+    }
+    card.append(caption,bars);return card
   }));
-  el('cards').replaceChildren(...[['총 편성액',money(budget)],['누적 집행액',money(spent)],['집행 잔액',money(budget-spent)]].map(([label,value])=>{
-    const card=document.createElement('div'),strong=document.createElement('strong');card.className='card';strong.textContent=value;card.append(label,strong);return card
+  el('cards').replaceChildren(...[['▤','프로그램',rows.length+'개'],['₩','총 편성액',money(budget)],['↗','누적 집행액',money(spent)],['✓','집행 잔액',money(budget-spent)]].map(([icon,label,value])=>{
+    const card=document.createElement('article'),symbol=document.createElement('span'),caption=document.createElement('p'),strong=document.createElement('strong');
+    card.className='card';symbol.className='symbol';symbol.setAttribute('aria-hidden','true');symbol.textContent=icon;caption.textContent=label;strong.textContent=loaded?value:'—';card.append(symbol,caption,strong);return card
   }));
   table('programs',['프로그램','사업재원','파트','편성액','집행액','집행률','완료 여부','목표 대비'],rows.map(p=>[link(p.name,p.url),p.fund,p.part,money(p.budget),money(p.spent),pct(p.spent,p.budget),p.status||'미기록',pct(p.actual,p.target)]));
   table('indicators',['사업재원','구분','지표명','세부요소','단위','전년도 실적','당해 목표','당해 실적','전년도 대비','목표 대비'],rows.filter(p=>p.indicator&&/^(대학AID|대학혁신(?:지원사업)?)$/.test(p.fund)).map(p=>[p.fund,p.category,link(p.indicator,p.url),p.detail,p.unit,p.prior,p.target,p.actual,pct(p.actual,p.prior),pct(p.actual,p.target)]));
@@ -58,13 +194,17 @@ function render(){
 function load(){
   el('reload').disabled=true;el('message').textContent='불러오는 중…';
   google.script.run.withSuccessHandler(data=>{
-    programs=data.programs;el('sheet').href=data.url;el('sheet').hidden=false;
+    programs=data.programs;loaded=true;el('sheet').href=data.url;el('sheet').hidden=false;
     options('year',programs.map(p=>p.year).sort().reverse(),'전체 연도');
     options('fund',[...funds,...programs.map(p=>p.fund)],'전체 재원');
     options('part',parts,'전체 파트');options('status',['완료 (O)','미완료 (X)'],'전체 완료 여부');
     render();el('message').textContent='';el('reload').disabled=false;
-  }).withFailureHandler(error=>{el('message').textContent='데이터를 불러오지 못했습니다. '+error.message;el('reload').disabled=false}).readCtlDashboard();
+  }).withFailureHandler(error=>{el('message').textContent=error.message.includes('setupCtlWebApp')?'아직 CTL 시트가 연결되지 않았습니다. Apps Script 편집기에서 setupCtlWebApp을 한 번 실행한 뒤 새로고침하세요.':'데이터를 불러오지 못했습니다. '+error.message;el('reload').disabled=false}).readCtlDashboard();
 }
 ['year','fund','part','status'].forEach(id=>el(id).addEventListener('change',render));
-el('reload').onclick=load;load();
-</script></main></body></html>
+options('year',[],'전체 연도');
+options('fund',funds,'전체 재원');
+options('part',parts,'전체 파트');
+options('status',['완료 (O)','미완료 (X)'],'전체 완료 여부');
+el('reload').onclick=load;render();load();
+</script></body></html>
