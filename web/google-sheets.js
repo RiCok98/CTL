@@ -31,7 +31,24 @@
       body: body === undefined ? undefined : JSON.stringify(body)
     });
     if (response.status === 401) throw new Error("Google 연결이 만료되었습니다. 다시 연결하세요.");
-    if (response.status === 403) throw new Error("Google 시트 권한 또는 Sheets API 사용 설정을 확인하세요.");
+    if (response.status === 403) {
+      const payload = await response.json().catch(() => ({}));
+      const reasons = [...(payload.error?.details ?? []), ...(payload.error?.errors ?? [])]
+        .map(detail => detail.reason);
+      if (reasons.some(reason => ["SERVICE_DISABLED", "accessNotConfigured"].includes(reason))) {
+        throw new Error("OAuth 클라이언트 ID를 만든 Google Cloud 프로젝트에서 Google Sheets API를 활성화한 뒤 다시 연결하세요.");
+      }
+      if (reasons.includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT") || reasons.includes("insufficientPermissions") ||
+          /insufficient authentication scopes/i.test(payload.error?.message ?? "")) {
+        throw new Error("Google 연결을 다시 누르고 권한 화면에서 스프레드시트 액세스를 허용하세요.");
+      }
+      if (reasons.includes("ORG_RESTRICTION_VIOLATION") || reasons.includes("SECURITY_POLICY_VIOLATED")) {
+        throw new Error("Google 조직 정책에서 Sheets API 접근을 차단했습니다. 학교 관리자에게 확인하세요.");
+      }
+      throw new Error(method === "GET"
+        ? "연결한 Google 계정으로 이 시트를 직접 열 수 있는지 확인하세요. 열 수 있다면 Google Cloud 프로젝트의 Sheets API 사용 설정도 확인하세요."
+        : "시트 또는 지출 범위를 편집할 권한이 없습니다. 같은 Google 계정의 편집 권한과 범위 보호 설정을 확인하세요.");
+    }
     if (!response.ok) throw new Error("Google 시트 요청이 실패했습니다 (" + response.status + ").");
     return response.json();
   }
