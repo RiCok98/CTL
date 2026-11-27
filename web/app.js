@@ -533,7 +533,7 @@ function operationFaculty(record) {
   return record.facultyMembers ?? (record.faculty ? [{ name: record.faculty, type: record.facultyType }] : []);
 }
 function operationCsvRows() {
-  const rows = [["사업연도", "파트", "프로그램", "날짜", "유형", "항목·회차", "지출액(원)", "이수인원(명)", "이수·운영시간(시간)", "신청인원(명)", "신청 운영시간(시간)", "성과지표", "단위", "추가 달성값", "학과명", "운영교수", "교원 유형"]];
+  const rows = [["사업연도", "파트", "프로그램", "날짜", "유형", "항목·회차", "지출액(원)", "이수인원(명)", "이수·운영시간(시간)", "신청인원(명)", "신청 운영시간(시간)", "성과지표", "단위", "추가 달성값", "학과명", "운영교수", "교원 유형", "지출 항목별 금액"]];
   for (const program of operatingPrograms()) {
     for (const record of programOperations(program.id)) {
       const expense = hasOperation(record, "expense");
@@ -541,7 +541,8 @@ function operationCsvRows() {
         record.label, expense ? record.amount : "", record.people ?? "", record.hours ?? "",
         record.applicants ?? "", record.requestedHours ?? "", record.indicatorName ?? "", record.unit ?? "", record.value ?? "",
         record.department ?? "", operationFaculty(record).map(member => member.name).join(" / "),
-        operationFaculty(record).map(member => member.type ? teacherLabel(member.type) : "—").join(" / ")]);
+        operationFaculty(record).map(member => member.type ? teacherLabel(member.type) : "—").join(" / "),
+        (record.expenseItems ?? []).map(item => item.name + " " + won(item.amount)).join(" / ")]);
     }
   }
   return rows;
@@ -621,7 +622,7 @@ function renderOperations() {
   const records = local ? operationRecords.filter(record => names.has(record.programId)).slice().reverse() : [];
   $("operationRows").innerHTML = records.map(record => `
     <tr><td>${esc(names.get(record.programId))}</td><td>${esc(record.date)}</td><td>${operationKinds(record).map(operationTypeLabel).join(" · ")}</td>
-    <td>${esc(record.label)}</td><td>${[record.department, ...operationFaculty(record).map(member =>
+    <td>${esc(record.label)}${(record.expenseItems ?? []).map(item => "<br><small class=hint>" + esc(item.name) + " " + won(item.amount) + "</small>").join("")}</td><td>${[record.department, ...operationFaculty(record).map(member =>
       member.name + (member.type ? " (" + teacherLabel(member.type) + ")" : ""))].filter(Boolean).map(esc).join("<br>") || "—"}</td><td>${hasOperation(record, "expense") ? won(record.amount) : "—"}</td>
     <td>${hasOperation(record, "session") ? number(record.people) + "명" : "—"}</td>
     <td>${hasOperation(record, "session") ? number(record.hours) + "시간" : "—"}</td>
@@ -640,6 +641,8 @@ function openOperationEntry() {
   }
   $("operationForm").reset();
   $("operationFacultyRows").replaceChildren();
+  $("operationExpenseRows").replaceChildren();
+  addOperationExpense();
   const select = $("operationEntryProgram");
   select.replaceChildren(new Option("프로그램 선택", ""), ...programs.map(programOption));
   const filtered = operatingPrograms();
@@ -682,11 +685,37 @@ $("operationSummary").addEventListener("click", event => {
 function operationTypeLabel(kind) {
   return { expense: "지출", session: "신청·운영 실적", indicator: "성과 달성값" }[kind] ?? "";
 }
+function expenseDraft() {
+  return [...$("operationExpenseRows").children].map(row => ({
+    name: row.querySelector(".operation-expense-name").value.trim(),
+    amount: row.querySelector(".operation-expense-amount").valueAsNumber
+  }));
+}
+function renderExpenseTotal() {
+  const amounts = expenseDraft().filter(item => Number.isSafeInteger(item.amount) && item.amount > 0);
+  $("operationExpenseTotal").textContent = "합계 " + won(sum(amounts, "amount"));
+}
+function addOperationExpense() {
+  const row = $("operationExpenseTemplate").content.firstElementChild.cloneNode(true);
+  row.querySelector(".operation-expense-remove").onclick = () => {
+    row.remove();
+    if (!$("operationExpenseRows").childElementCount) addOperationExpense();
+    renderExpenseTotal();
+    $("operationExpenseAdd").focus();
+  };
+  $("operationExpenseRows").append(row);
+  renderExpenseTotal();
+  return row;
+}
+$("operationExpenseAdd").onclick = () => addOperationExpense().querySelector("input").focus();
+$("operationExpenseRows").addEventListener("input", renderExpenseTotal);
 function setOperationFields() {
   const kinds = [...$("operationForm").querySelectorAll('[name="kind"]:checked')].map(input => input.value);
-  const labels = { expense: "지출 항목", session: "회차·운영 내용", indicator: "성과 기록 내용" };
+  const labels = { expense: "지출 메모 (선택)", session: "회차·운영 내용", indicator: "성과 기록 내용" };
   $("operationLabel").textContent = kinds.length === 1 ? labels[kinds[0]] : "항목·회차";
-  for (const [id, type] of [["operationAmount", "expense"], ["operationPeople", "session"],
+  $("operationForm").elements.label.required = !(kinds.length === 1 && kinds[0] === "expense");
+  $("operationAmount").hidden = $("operationAmount").disabled = !kinds.includes("expense");
+  for (const [id, type] of [["operationPeople", "session"],
     ["operationHours", "session"], ["operationApplicants", "session"], ["operationRequested", "session"],
     ["operationIndicatorField", "indicator"], ["operationActual", "indicator"]]) {
     const active = kinds.includes(type);
@@ -718,15 +747,19 @@ $("operationForm").addEventListener("submit", event => {
   if (!program) return;
   const data = new FormData(event.currentTarget);
   const kinds = data.getAll("kind");
-  const date = String(data.get("date") ?? ""), label = String(data.get("label") ?? "").trim();
+  const date = String(data.get("date") ?? "");
+  let label = String(data.get("label") ?? "").trim();
   const details = {};
   const fail = message => { $("operationError").textContent = message; };
   if (!kinds.length) return fail("기록 유형을 하나 이상 선택하세요.");
-  if (!label || !date) return fail("날짜와 항목·회차를 입력하세요.");
+  if (!date || (!label && !(kinds.length === 1 && kinds[0] === "expense"))) return fail("날짜와 항목·회차를 입력하세요.");
   if (kinds.includes("expense")) {
-    const amount = Number(data.get("amount"));
-    if (!Number.isSafeInteger(amount) || amount <= 0) return fail("지출 금액을 확인하세요.");
-    details.amount = amount;
+    const expenseItems = expenseDraft();
+    const amount = sum(expenseItems, "amount");
+    if (!expenseItems.length || expenseItems.some(item => !item.name || !Number.isSafeInteger(item.amount) || item.amount <= 0) ||
+        !Number.isSafeInteger(amount)) return fail("지출 항목별 이름과 원 단위 금액을 확인하세요.");
+    Object.assign(details, { amount, expenseItems });
+    if (!label) label = expenseItems[0].name + (expenseItems.length > 1 ? " 외 " + (expenseItems.length - 1) + "건" : "");
   }
   if (kinds.includes("session")) {
     const people = Number(data.get("people")), hours = Number(data.get("hours"));
