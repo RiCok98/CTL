@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f7f5;color:#18352d;font:14px system-ui,sans-serif}main{max-width:1180px;margin:auto;padding:24px 16px}h1{margin:0 0 18px;font-size:clamp(22px,4vw,32px)}h2{font-size:18px;margin:0 0 12px}.row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}label{display:grid;gap:5px}select,button,a.action{font:inherit;padding:8px 10px;border:1px solid #cbded3;border-radius:8px;background:white;color:#144334}button,a{cursor:pointer}.panel,.card{background:white;border:1px solid #dce7df;border-radius:14px;padding:16px;margin-top:14px}.hero{background:#123d35;color:white}.big{font-size:34px;font-weight:750;margin-top:5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}.card strong{display:block;font-size:22px;margin-top:6px}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;white-space:nowrap}th,td{text-align:left;padding:9px;border-bottom:1px solid #e7eee9}th{background:#edf5ef}a{color:#14684e}progress{width:100%;accent-color:#2c946d}.hero progress{accent-color:#a5e2b5}.area{min-width:150px;flex:1}#message{margin:12px 0}
+</style></head><body><main>
+<h1>CTL 교수학습혁신센터 예산·성과 대시보드</h1>
+<div class="panel row">
+<label>사업연도<select id="year"></select></label><label>사업재원<select id="fund"></select></label>
+<label>파트<select id="part"></select></label><label>완료 여부<select id="status"></select></label>
+<button id="reload" type="button">새로고침</button><a class="action" id="sheet" hidden>구글 시트 열기</a>
+</div>
+<p id="message" role="status"></p>
+<section class="panel hero"><h2>예산 집행률</h2><div class="big" id="rate">—</div><div id="areas" class="row"></div></section>
+<div class="cards" id="cards"></div>
+<section class="panel"><h2>프로그램별 예산·성과</h2><div class="scroll"><table id="programs"></table></div></section>
+<section class="panel"><h2>자율성과지표 관리 · 대학AID·대학혁신</h2><div class="scroll"><table id="indicators"></table></div></section>
+<script>
+const el=id=>document.getElementById(id);
+const parts=['교수파트','학습파트','원격파트'];
+const funds=['대학혁신','대학AID','대학앵커','대학교비'];
+const money=n=>n.toLocaleString('ko-KR')+'원';
+const pct=(n,d)=>n==null||!d?'—':(100*n/d).toFixed(1)+'%';
+let programs=[];
+function options(id,values,label){
+  const select=el(id),previous=select.value;
+  select.replaceChildren(new Option(label,''), ...[...new Set(values.filter(Boolean))].map(value=>new Option(value,value)));
+  if([...select.options].some(option=>option.value===previous)) select.value=previous;
+}
+function table(id,headers,rows){
+  const target=el(id),head=target.createTHead();head.replaceChildren();
+  const header=head.insertRow();
+  headers.forEach(title=>{const th=document.createElement('th');th.textContent=title;header.append(th)});
+  [...target.tBodies].forEach(body=>body.remove());
+  const body=target.createTBody();
+  if(!rows.length){const cell=body.insertRow().insertCell();cell.colSpan=headers.length;cell.textContent='조건에 맞는 데이터가 없습니다.';return}
+  rows.forEach(values=>{const row=body.insertRow();values.forEach(value=>{const cell=row.insertCell();if(value instanceof Node)cell.append(value);else cell.textContent=value??'—'})});
+}
+function link(text,url){const a=document.createElement('a');a.textContent=text;a.href=url;a.rel='noopener noreferrer';return a}
+function sum(items,key){return items.reduce((total,p)=>total+p[key],0)}
+function render(){
+  const filtered=programs.filter(p=>['year','fund','status'].every(key=>!el(key).value||p[key]===el(key).value));
+  const rows=filtered.filter(p=>!el('part').value||p.part===el('part').value);
+  const budget=sum(rows,'budget'),spent=sum(rows,'spent');
+  el('rate').textContent=pct(spent,budget);
+  el('areas').replaceChildren(...parts.map(part=>{
+    const list=filtered.filter(p=>p.part===part), card=document.createElement('div');card.className='area';
+    const complete=list.filter(p=>p.status==='완료 (O)').length,b=sum(list,'budget'),s=sum(list,'spent');
+    const caption=document.createElement('p');caption.textContent=part+' · 완료 '+complete+'/'+list.length+'건 · 집행 '+pct(s,b);
+    const bar=document.createElement('progress');bar.max=1;bar.value=b?Math.max(0,Math.min(1,s/b)):0;
+    bar.setAttribute('aria-label',part+' 예산 집행률');card.append(caption,bar);return card
+  }));
+  el('cards').replaceChildren(...[['총 편성액',money(budget)],['누적 집행액',money(spent)],['집행 잔액',money(budget-spent)]].map(([label,value])=>{
+    const card=document.createElement('div'),strong=document.createElement('strong');card.className='card';strong.textContent=value;card.append(label,strong);return card
+  }));
+  table('programs',['프로그램','사업재원','파트','편성액','집행액','집행률','완료 여부','목표 대비'],rows.map(p=>[link(p.name,p.url),p.fund,p.part,money(p.budget),money(p.spent),pct(p.spent,p.budget),p.status||'미기록',pct(p.actual,p.target)]));
+  table('indicators',['사업재원','구분','지표명','세부요소','단위','전년도 실적','당해 목표','당해 실적','전년도 대비','목표 대비'],rows.filter(p=>p.indicator&&/^(대학AID|대학혁신(?:지원사업)?)$/.test(p.fund)).map(p=>[p.fund,p.category,link(p.indicator,p.url),p.detail,p.unit,p.prior,p.target,p.actual,pct(p.actual,p.prior),pct(p.actual,p.target)]));
+}
+function load(){
+  el('reload').disabled=true;el('message').textContent='불러오는 중…';
+  google.script.run.withSuccessHandler(data=>{
+    programs=data.programs;el('sheet').href=data.url;el('sheet').hidden=false;
+    options('year',programs.map(p=>p.year).sort().reverse(),'전체 연도');
+    options('fund',[...funds,...programs.map(p=>p.fund)],'전체 재원');
+    options('part',parts,'전체 파트');options('status',['완료 (O)','미완료 (X)'],'전체 완료 여부');
+    render();el('message').textContent='';el('reload').disabled=false;
+  }).withFailureHandler(error=>{el('message').textContent='데이터를 불러오지 못했습니다. '+error.message;el('reload').disabled=false}).readCtlDashboard();
+}
+['year','fund','part','status'].forEach(id=>el(id).addEventListener('change',render));
+el('reload').onclick=load;load();
+</script></main></body></html>
