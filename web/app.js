@@ -21,15 +21,28 @@ try { operationRecords = readOperations(); } catch {}
 function programOperations(id) {
   return shared || window.ctlSheetActive ? [] : operationRecords.filter(record => record.programId === id);
 }
+const primaryIndicatorId = "primary";
+const indicatorId = (indicator, index) => indicator.id ?? "existing-" + index;
 function programTotals(program) {
   const records = programOperations(program.id);
   if (!records.length) return program;
   const sessions = records.filter(record => record.kind === "session");
+  const addSession = (base, field) => sessions.some(record => record[field] != null)
+    ? (base ?? 0) + sessions.reduce((total, record) => total + (record[field] ?? 0), 0) : base;
+  const achievements = records.filter(record => record.kind === "indicator");
+  const achieved = (base, id) => (base ?? 0) +
+    sum(achievements.filter(record => record.indicatorId === id), "value");
   return {
     ...program,
     spent: (program.spent ?? 0) + sum(records.filter(record => record.kind === "expense"), "amount"),
-    completions: sessions.length ? (program.completions ?? 0) + sum(sessions, "people") : program.completions,
-    operatingHours: sessions.length ? (program.operatingHours ?? 0) + sum(sessions, "hours") : program.operatingHours
+    applicants: addSession(program.applicants, "applicants"),
+    requestedHours: addSession(program.requestedHours, "requestedHours"),
+    completions: addSession(program.completions, "people"),
+    operatingHours: addSession(program.operatingHours, "hours"),
+    actual: achieved(program.actual, primaryIndicatorId),
+    extraIndicators: (program.extraIndicators ?? []).map((indicator, index) => ({
+      ...indicator, actual: achieved(indicator.actual, indicatorId(indicator, index))
+    }))
   };
 }
 const sample = [
@@ -281,6 +294,7 @@ function addExpense(expense = {}) {
 $("expenseAdd").onclick = () => addExpense().querySelector(".expense-name").focus();
 function addIndicator(indicator = {}) {
   const row = $("indicatorTemplate").content.firstElementChild.cloneNode(true);
+  row.dataset.indicatorId = indicator.id ?? crypto.randomUUID();
   for (const field of row.querySelectorAll("[data-indicator]")) {
     field.value = indicator[field.dataset.indicator] ?? (field.dataset.indicator === "actual" ? 0 : "");
   }
@@ -303,7 +317,7 @@ function openEdit(id) {
   updateOrganizationField();
   $("extraIndicators").replaceChildren();
   $("indicatorAdd").disabled = false;
-  for (const indicator of record.extraIndicators ?? []) addIndicator(indicator);
+  (record.extraIndicators ?? []).forEach((indicator, index) => addIndicator({ ...indicator, id: indicatorId(indicator, index) }));
   $("legacySpent").hidden = $("legacyExpenses").hidden = !shared;
   $("form").elements.spent.disabled = !shared;
   $("expenses").replaceChildren();
@@ -398,6 +412,7 @@ $("form").addEventListener("submit", async event => {
   p.extraIndicators = [...$("extraIndicators").children].map(row => {
     const indicator = Object.fromEntries([...row.querySelectorAll("[data-indicator]")]
       .map(field => [field.dataset.indicator, field.value.trim()]));
+    indicator.id = row.dataset.indicatorId;
     indicator.priorActual = indicator.priorActual === "" ? null : Number(indicator.priorActual);
     indicator.target = parseIndicatorNumber(indicator.target);
     indicator.actual = parseIndicatorNumber(indicator.actual);
@@ -510,15 +525,16 @@ function downloadCsv(rows, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function operationCsvRows() {
-  const rows = [["사업연도", "파트", "프로그램", "날짜", "유형", "항목·회차", "지출액(원)", "이수인원(명)", "이수·운영시간(시간)"]];
+  const rows = [["사업연도", "파트", "프로그램", "날짜", "유형", "항목·회차", "지출액(원)", "이수인원(명)", "이수·운영시간(시간)", "신청인원(명)", "신청 운영시간(시간)", "성과지표", "단위", "추가 달성값"]];
   const selectedPart = $("operationPart").value;
   const selectedId = $("operationProgram").value;
   for (const program of programs) {
     if ((selectedPart && selectedPart !== program.part) || (selectedId && selectedId !== program.id)) continue;
     for (const record of programOperations(program.id)) {
       const expense = record.kind === "expense";
-      rows.push([program.year, program.part, program.name, record.date, expense ? "지출" : "운영 실적",
-        record.label, expense ? record.amount : "", expense ? "" : record.people, expense ? "" : record.hours]);
+      rows.push([program.year, program.part, program.name, record.date, operationTypeLabel(record.kind),
+        record.label, expense ? record.amount : "", record.people ?? "", record.hours ?? "",
+        record.applicants ?? "", record.requestedHours ?? "", record.indicatorName ?? "", record.unit ?? "", record.value ?? ""]);
     }
   }
   return rows;
@@ -567,6 +583,15 @@ function renderOperations() {
     new Option(program.name + " · " + program.year + " · " + (program.part || "미분류"), program.id)));
   if (choices.some(program => program.id === previous)) select.value = previous;
   const program = choices.find(item => item.id === select.value);
+  const indicatorSelect = $("operationIndicator");
+  const previousIndicator = indicatorSelect.value;
+  const options = program ? [
+    [primaryIndicatorId, program.indicator || "기본 성과지표", program.unit],
+    ...(program.extraIndicators ?? []).map((indicator, index) =>
+      [indicatorId(indicator, index), indicator.indicator, indicator.unit])
+  ] : [];
+  indicatorSelect.replaceChildren(...options.map(([id, name, unit]) => new Option(name + " (" + unit + ")", id)));
+  if (options.some(([id]) => id === previousIndicator)) indicatorSelect.value = previousIndicator;
   $("operationForm").hidden = !program || !local;
   $("operationNotice").textContent = !local ? "브라우저에 저장된 프로그램에서 운영 기록을 추가할 수 있습니다." :
     !choices.length ? "프로그램 관리에서 프로그램을 먼저 등록해 주세요." :
@@ -579,19 +604,27 @@ function renderOperations() {
     "명 · 이수·운영 " + number(total.operatingHours ?? 0) + "시간" : "";
   const records = program ? programOperations(program.id).slice().reverse() : [];
   $("operationRows").innerHTML = records.map(record => `
-    <tr><td>${esc(record.date)}</td><td>${record.kind === "expense" ? "지출" : "운영 실적"}</td>
+    <tr><td>${esc(record.date)}</td><td>${operationTypeLabel(record.kind)}</td>
     <td>${esc(record.label)}</td><td>${record.kind === "expense" ? won(record.amount) : "—"}</td>
     <td>${record.kind === "session" ? number(record.people) + "명" : "—"}</td>
     <td>${record.kind === "session" ? number(record.hours) + "시간" : "—"}</td>
+    <td>${record.kind === "indicator" ? esc(record.indicatorName) + " +" + number(record.value) + " " + esc(record.unit) :
+      record.kind === "session" ? [record.applicants == null ? "" : "신청 " + number(record.applicants) + "명",
+        record.requestedHours == null ? "" : "신청 운영 " + number(record.requestedHours) + "시간"].filter(Boolean).join(" · ") || "—" : "—"}</td>
     <td><button class="edit danger" type="button" data-remove-operation="${esc(record.id)}">삭제</button></td></tr>`
-  ).join("") || '<tr><td colspan="7">표시할 운영 기록이 없습니다.</td></tr>';
+  ).join("") || '<tr><td colspan="8">표시할 운영 기록이 없습니다.</td></tr>';
+}
+function operationTypeLabel(kind) {
+  return { expense: "지출", session: "신청·운영 실적", indicator: "성과 달성값" }[kind] ?? "";
 }
 function setOperationFields() {
-  const expense = $("operationKind").value === "expense";
-  $("operationLabel").textContent = expense ? "지출 항목" : "회차·운영 내용";
-  for (const [id, visible] of [["operationAmount", expense], ["operationPeople", !expense], ["operationHours", !expense]]) {
-    $(id).hidden = !visible;
-    $(id).querySelector("input").disabled = !visible;
+  const kind = $("operationKind").value;
+  $("operationLabel").textContent = { expense: "지출 항목", session: "회차·운영 내용", indicator: "성과 기록 내용" }[kind];
+  for (const [id, type] of [["operationAmount", "expense"], ["operationPeople", "session"],
+    ["operationHours", "session"], ["operationApplicants", "session"], ["operationRequested", "session"],
+    ["operationIndicatorField", "indicator"], ["operationActual", "indicator"]]) {
+    $(id).hidden = kind !== type;
+    $(id).querySelector("input, select").disabled = kind !== type;
   }
 }
 function saveOperations(change) {
@@ -612,16 +645,37 @@ $("operationForm").addEventListener("submit", event => {
   event.preventDefault();
   if (shared || window.ctlSheetActive) return;
   const programId = $("operationProgram").value;
-  if (!programs.some(program => program.id === programId)) return;
+  const program = programs.find(item => item.id === programId);
+  if (!program) return;
   const data = new FormData(event.currentTarget);
   const kind = data.get("kind"), date = String(data.get("date") ?? ""), label = String(data.get("label") ?? "").trim();
-  const amount = Number(data.get("amount")), people = Number(data.get("people")), hours = Number(data.get("hours"));
-  if (!label || !date || (kind === "expense" ? !Number.isSafeInteger(amount) || amount <= 0 :
-      !Number.isSafeInteger(people) || people < 0 || !Number.isFinite(hours) || hours < 0)) {
+  let details;
+  if (kind === "expense") {
+    const amount = Number(data.get("amount"));
+    if (Number.isSafeInteger(amount) && amount > 0) details = { amount };
+  } else if (kind === "session") {
+    const people = Number(data.get("people")), hours = Number(data.get("hours"));
+    const optional = key => data.get(key) === "" ? null : Number(data.get(key));
+    const applicants = optional("applicants"), requestedHours = optional("requestedHours");
+    if (Number.isSafeInteger(people) && people >= 0 && Number.isFinite(hours) && hours >= 0 &&
+        (applicants == null || Number.isSafeInteger(applicants) && applicants >= 0) &&
+        (requestedHours == null || Number.isFinite(requestedHours) && requestedHours >= 0)) {
+      details = { people, hours, applicants, requestedHours };
+    }
+  } else if (kind === "indicator") {
+    const selected = data.get("indicatorId");
+    const indicator = selected === primaryIndicatorId ? program :
+      (program.extraIndicators ?? []).find((item, index) => indicatorId(item, index) === selected);
+    const value = parseIndicatorNumber(data.get("indicatorValue"));
+    if (indicator && Number.isFinite(value)) details = {
+      indicatorId: selected, indicatorName: indicator.indicator || "기본 성과지표", unit: indicator.unit, value
+    };
+  }
+  if (!label || !date || !details) {
     $("operationNotice").textContent = "날짜, 항목과 수치를 확인하세요.";
     return;
   }
-  const record = { id: crypto.randomUUID(), programId, kind, date, label, ...(kind === "expense" ? { amount } : { people, hours }) };
+  const record = { id: crypto.randomUUID(), programId, kind, date, label, ...details };
   if (saveOperations(records => [...records, record])) {
     event.currentTarget.reset();
     setOperationFields();

@@ -12,15 +12,19 @@
 <div id="operationTotals" class="row" style="margin-top:12px"></div><p id="operationOpening" class="hint"></p>
 <form id="operationForm" hidden>
 <div class="fields">
-<label>기록 유형<select id="operationKind" name="kind"><option value="expense">지출</option><option value="session">운영 실적</option></select></label>
+<label>기록 유형<select id="operationKind" name="kind"><option value="expense">지출</option><option value="session">신청·운영 실적</option><option value="indicator">성과 달성값</option></select></label>
 <label>날짜<input name="date" type="date" required></label>
 <label class="wide"><span id="operationLabel">지출 항목</span><input name="label" maxlength="100" required></label>
 <label id="operationAmount">금액 (원)<input name="amount" type="number" min="1" max="999999999999" step="1" required></label>
+<label id="operationApplicants" hidden>신청인원 (명)<input name="applicants" type="number" min="0" max="999999999" step="1" disabled></label>
+<label id="operationRequested" hidden>신청 운영시간 (시간)<input name="requestedHours" type="number" min="0" max="999999" step="any" disabled></label>
+<label id="operationIndicatorField" hidden>성과지표<select id="operationIndicator" name="indicatorId" disabled required></select></label>
+<label id="operationActual" hidden>추가 달성값<input name="indicatorValue" inputmode="decimal" disabled required></label>
 <label id="operationPeople" hidden>이수인원 (연인원)<input name="people" type="number" min="0" max="999999999" step="1" disabled required></label>
 <label id="operationHours" hidden>이수·운영시간 (시간)<input name="hours" type="number" min="0" max="999999" step="any" disabled required></label>
 </div><button class="primary" type="submit">기록 추가</button>
 </form>
-<div class="tablewrap" style="margin-top:16px"><table><thead><tr><th>날짜</th><th>유형</th><th>항목·회차</th><th>지출액</th><th>이수인원</th><th>이수·운영시간</th><th>관리</th></tr></thead><tbody id="operationRows"></tbody></table></div>
+<div class="tablewrap" style="margin-top:16px"><table><thead><tr><th>날짜</th><th>유형</th><th>항목·회차</th><th>지출액</th><th>이수인원</th><th>이수·운영시간</th><th>신청·성과 내역</th><th>관리</th></tr></thead><tbody id="operationRows"></tbody></table></div>
 </section>
 <div id="dashboardDetails">
 <section class="panel">
@@ -75,7 +79,7 @@
 <dialog id="dialog" aria-labelledby="dialogTitle"><form id="form"><div class="row"><h2 id="dialogTitle"></h2><button class="secondary" type="button" id="close" aria-label="닫기">✕</button></div><div class="fields"><label class="wide">프로그램명<input name="name" required maxlength="100"></label><label>파트<select name="part" required><option value="">선택</option><option>교원파트</option><option>학습파트</option><option>원격파트</option></select></label><label>운영 유형<select name="lead" required><option value="">선택</option><option>학과주도</option><option>부서주도</option><option>기타</option></select></label><label class="wide" id="orgField"><span id="orgLabel">주관 학과·부서명</span><input name="org" maxlength="80"></label><label>재원<input name="fund" list="fundOptions" required maxlength="60"><datalist id="fundOptions"></datalist></label><label>사업연도<input name="year" type="number" min="1900" max="9999" required></label><label>예산 편성액 (원)<input name="budget" type="number" min="0" max="999999999999" step="1" required></label><label id="legacySpent" hidden>기존 지출액 (원)<input name="spent" type="number" min="0" max="999999999999" step="1" required></label><label>운영 완료 여부<select name="completion"><option value="in_progress">운영중</option><option value="done">완료 (O)</option><option value="pending">미완료 (X)</option></select></label>
 <label>성과지표명<input name="indicator" maxlength="100" placeholder="예: 참여시간"></label>
 <input name="indicatorCategory" type="hidden"><input name="indicatorDetail" type="hidden"><input name="priorActual" type="hidden">
-<label>목표값<input name="target" inputmode="decimal" maxlength="16" placeholder="예: 2,400" required></label><label>달성값<input name="actual" inputmode="decimal" maxlength="16" placeholder="예: 4,188" required></label><label>성과 단위<input name="unit" placeholder="예: 시간, 명, 건" maxlength="20" required></label><label class="wide">비고<textarea name="indicatorNote" maxlength="500" rows="2" placeholder="예: 추진실적·계획"></textarea></label><label>담당자<input name="owner" maxlength="80" required></label></div>
+<label>목표값<input name="target" inputmode="decimal" maxlength="16" placeholder="예: 2,400" required></label><input name="actual" type="hidden"><label>성과 단위<input name="unit" placeholder="예: 시간, 명, 건" maxlength="20" required></label><label class="wide">비고<textarea name="indicatorNote" maxlength="500" rows="2" placeholder="예: 추진실적·계획"></textarea></label><label>담당자<input name="owner" maxlength="80" required></label></div>
 <fieldset class="detail-section"><legend>추가 성과지표</legend>
 <div id="extraIndicators"></div>
 <button id="indicatorAdd" type="button" class="secondary">＋ 성과지표 추가</button>
@@ -88,7 +92,7 @@
 <input data-indicator="indicatorDetail" type="hidden">
 <input data-indicator="priorActual" type="hidden">
 <label>목표값<input data-indicator="target" inputmode="decimal" maxlength="16" placeholder="예: 2,400" required></label>
-<label>달성값<input data-indicator="actual" inputmode="decimal" maxlength="16" placeholder="예: 4,188" required></label>
+<input data-indicator="actual" type="hidden">
 <label class="wide">비고<textarea data-indicator="indicatorNote" maxlength="500" rows="2" placeholder="예: 추진실적·계획"></textarea></label></div><button class="secondary danger indicator-remove" type="button">이 지표 삭제</button>
 </div></template>
 <fieldset class="detail-section" id="legacyExpenses" hidden><legend>세부 지출 내역</legend>
@@ -100,15 +104,8 @@
 <label>금액 (원)<input class="expense-amount" type="number" min="0" max="999999999999" step="1" required></label>
 <button class="secondary danger expense-remove" type="button">삭제</button>
 </div></template>
-<fieldset class="detail-section"><legend>신청·운영 실적</legend>
-<p class="hint" style="margin-bottom:8px">운영현황에 기록한 이수인원과 시간은 기존 값에 자동으로 더해집니다.</p>
-<div class="fields">
-<label>신청인원 (명)<input name="applicants" type="number" min="0" max="999999999" step="1"></label>
-<label>신청 운영시간 (시간)<input name="requestedHours" type="number" min="0" max="999999" step="any"></label>
-<label>기존 이수인원 (명)<input name="completions" type="number" min="0" max="999999999" step="1"></label>
-<label>기존 운영시간 (시간)<input name="operatingHours" type="number" min="0" max="999999" step="any"></label>
-</div>
-</fieldset>
+<input name="applicants" type="hidden"><input name="requestedHours" type="hidden">
+<input name="completions" type="hidden"><input name="operatingHours" type="hidden">
 <fieldset class="detail-section"><legend>운영교원·직원</legend>
 <div id="teachers"></div><button id="teacherAdd" class="secondary" type="button">＋ 운영인력 추가</button>
 </fieldset>

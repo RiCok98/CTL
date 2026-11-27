@@ -28,7 +28,7 @@ function validateAdditionalIndicators(indicators) {
   return indicators === undefined || (Array.isArray(indicators) && indicators.length <= 15 &&
     indicators.every(i => i && typeof i.indicator === "string" && i.indicator.trim() &&
       typeof i.unit === "string" && i.unit.trim() && optionalText(i.indicator, 100) &&
-      optionalText(i.unit, 20) && optionalText(i.indicatorCategory, 60) && optionalText(i.indicatorDetail, 120) && optionalText(i.indicatorNote, 500) &&
+      optionalText(i.unit, 20) && optionalText(i.id, 80) && optionalText(i.indicatorCategory, 60) && optionalText(i.indicatorDetail, 120) && optionalText(i.indicatorNote, 500) &&
       [i.target, i.actual].every(value => Number.isFinite(value) && value >= 0 && value <= 999999999) &&
       (i.priorActual == null || (Number.isFinite(i.priorActual) && i.priorActual >= 0 && i.priorActual <= 999999999))));
 }
@@ -109,7 +109,7 @@ export async function api(request, env, path) {
     for (const field of [...counts, ...hours]) record[field] = input[field] ?? null;
     record.completion = input.completion || "in_progress";
     record.extraIndicators = (input.extraIndicators ?? []).map(i => ({
-      indicator: i.indicator.trim(), unit: i.unit.trim(), indicatorCategory: i.indicatorCategory?.trim() ?? "",
+      id: i.id, indicator: i.indicator.trim(), unit: i.unit.trim(), indicatorCategory: i.indicatorCategory?.trim() ?? "",
       indicatorDetail: i.indicatorDetail?.trim() ?? "", indicatorNote: i.indicatorNote?.trim() ?? "", target: i.target, actual: i.actual, priorActual: i.priorActual ?? null
     }));
     record.indicator = input.indicator?.trim() ?? "";
