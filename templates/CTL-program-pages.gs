@@ -15,6 +15,7 @@ const CTL_CHOICES = {
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('CTL 프로그램')
     .addItem('선택한 프로그램 상세 열기·만들기', 'openCtlProgram')
+    .addItem('현재 상세 탭에 참여 학과 표 추가', 'addCtlDepartments')
     .addToUi();
 }
 
@@ -125,4 +126,59 @@ function ctlLink(label, url) {
 
 function ctlLiteral(value) {
   return typeof value === 'string' && value.startsWith('=') ? "'" + value : value;
+}
+
+
+function addCtlDepartments() {
+  const tab = SpreadsheetApp.getActiveSheet();
+  const ui = SpreadsheetApp.getUi();
+  if (tab.getRange('A3').getDisplayValue() !== '프로그램 정보' ||
+      tab.getRange('B7').getDisplayValue() !== '학과주도' ||
+      tab.getRange('D3:F3').getDisplayValues()[0].join('|') !== '지출일|지출 항목|금액 (원)') {
+    ui.alert('학과주도 프로그램의 상세 탭을 연 상태에서 실행하세요.');
+    return;
+  }
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(10000)) {
+    ui.alert('잠시 후 다시 시도하세요.');
+    return;
+  }
+  try {
+    if (tab.getRange('K3').getDisplayValue() === '참여 학과' &&
+        tab.getRange('G3').getDisplayValue() === '지출 학과') {
+      tab.getRange('K4').activate();
+      return;
+    }
+    const rows = Math.min(500, tab.getMaxRows() - 3);
+    if (rows < 1 || !tab.getRange(3, 7, tab.getMaxRows() - 2, 1).isBlank() ||
+        !tab.getRange(2, 11, tab.getMaxRows() - 1, 9).isBlank()) {
+      ui.alert('G열 또는 K~S열에 이미 값이 있어 기존 내용을 보호하기 위해 추가를 중단했습니다.');
+      return;
+    }
+    tab.getRange('K2').setValue('학과당 한 줄. 운영교수가 여러 명이면 셀 안에서 줄을 나누세요.');
+    tab.getRange('K3:S3').setValues([[
+      '참여 학과', '학과 담당자', '배정 예산 (원)', '신청인원', '신청 운영시간',
+      '이수인원', '실제 운영시간', '운영교수 (이름 / 유형 / 소속)', '학과별 지출 (자동)'
+    ]]).setBackground('#226650').setFontColor('#ffffff').setFontWeight('bold').setWrap(true);
+    tab.getRange(4, 11, rows, 8).setBackground('#eaf4ec');
+    tab.getRange(4, 18, rows).setWrap(true);
+    tab.getRange(4, 13, rows).setNumberFormat('#,##0');
+    tab.getRange(4, 19, rows).setNumberFormat('#,##0');
+    const totals = Array.from({ length: rows }, (_, i) => {
+      const row = i + 4;
+      // Match exact department names, including any wildcard characters in the name.
+      return ['=IF(K' + row + '="","",SUMIF($G$4:$G,"="&SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(K' +
+        row + ',"~","~~"),"*","~*"),"?","~?"),$F$4:$F))'];
+    });
+    tab.getRange(4, 19, rows).setFormulas(totals);
+    tab.getRange('G3').setValue('지출 학과').setBackground('#226650').setFontColor('#ffffff').setFontWeight('bold');
+    tab.getRange(4, 7, tab.getMaxRows() - 3).setDataValidation(SpreadsheetApp.newDataValidation()
+      .requireValueInRange(tab.getRange(4, 11, rows), true).setAllowInvalid(false).build());
+    const widths = [185, 125, 130, 100, 115, 100, 115, 255, 144];
+    widths.forEach((width, index) => tab.setColumnWidth(index + 11, width));
+    tab.setColumnWidth(7, 175);
+    tab.getRange('K4').activate();
+  } finally {
+    lock.releaseLock();
+  }
 }
