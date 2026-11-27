@@ -3,8 +3,8 @@ const $ = id => document.getElementById(id);
 const thisYear = Number(new Intl.DateTimeFormat("en", { year: "numeric", timeZone: "Asia/Seoul" }).format());
 const parts = ["교원파트", "학습파트", "원격파트"];
 const standardFunds = ["대학혁신", "대학AID", "대학앵커", "대학교비"];
-const completionLabels = { done: "완료 (O)", pending: "미완료 (X)", unset: "미기록" };
-const completionStatus = p => p.completion || "unset";
+const completionLabels = { done: "완료 (O)", pending: "미완료 (X)", in_progress: "운영중" };
+const completionStatus = p => Object.hasOwn(completionLabels, p.completion) ? p.completion : "in_progress";
 const matchesCompletion = (p, id) => !$(id).value || completionStatus(p) === $(id).value;
 const operationFields = ["applicants", "requestedHours", "completions", "operatingHours"];
 const teacherLabel = type => ["일반전임교원", "직원"].includes(type) ? type : "전담전임교원 – " + type;
@@ -169,7 +169,7 @@ function render() {
   ).join("") || '<p class="empty">목표 미달 프로그램이 없습니다.</p>';
   $("count").textContent = "· " + items.length + "개";
   $("rows").innerHTML = items.map(p =>
-    `<tr><td><button class="edit" type="button" data-edit="${esc(p.id)}">${esc(p.name)}</button><br><small class="hint">${p.year}${p.owner ? " · " + esc(p.owner) : ""}${p.local ? " · 로컬" : ""}</small></td><td>${esc(p.part || "미분류")}</td><td>${esc(p.lead || "미분류")}${p.org ? "<br><small class=hint>" + esc(p.org) + "</small>" : ""}</td><td>${esc(p.fund)}</td><td>${won(p.budget)}</td><td>${won(p.spent)}${p.expenses?.length ? "<br><small class=hint>세부 " + p.expenses.length + "건</small>" : ""}</td><td>${pct(p.spent,p.budget)}</td><td>${p.indicator ? "<b>" + esc(p.indicator) + "</b><br>" : ""}<small class="hint" title="전년도 실적">${p.year - 1} 실적 ${p.priorActual == null ? "—" : number(p.priorActual) + " " + esc(p.unit)}</small><br>${p.year} 목표 ${number(p.target)} / 실적 ${number(p.actual)} ${esc(p.unit)}</td><td>${pct(p.actual,p.target)}</td><td><span class="status ${status(p)}">${labels[status(p)]}</span><br><small class="hint">운영 ${completionLabels[completionStatus(p)]}</small></td><td class="hint">${operationDetails(p)}</td><td>${(p.teachers ?? []).map(t => esc(t.name) + " <small class=hint>(" + esc(teacherLabel(t.type)) + (t.affiliation ? " · " + esc(t.affiliation) : "") + ")</small>").join("<br>") || "—"}</td></tr>`
+    `<tr><td><button class="edit" type="button" data-edit="${esc(p.id)}">${esc(p.name)}</button><br><small class="hint">${p.year}${p.owner ? " · " + esc(p.owner) : ""}${p.local ? " · 로컬" : ""}</small></td><td>${esc(p.part || "미분류")}</td><td>${esc(p.lead || "미분류")}${p.org ? "<br><small class=hint>" + esc(p.org) + "</small>" : ""}</td><td>${esc(p.fund)}</td><td>${won(p.budget)}</td><td>${won(p.spent)}${p.expenses?.length ? "<br><small class=hint>세부 " + p.expenses.length + "건</small>" : ""}</td><td>${pct(p.spent,p.budget)}</td><td>${p.indicator ? "<b>" + esc(p.indicator) + "</b><br>" : ""}<small class="hint" title="전년도 실적">${p.year - 1} 실적 ${p.priorActual == null ? "—" : number(p.priorActual) + " " + esc(p.unit)}</small><br>${p.year} 목표 ${number(p.target)} / 실적 ${number(p.actual)} ${esc(p.unit)}</td><td>${pct(p.actual,p.target)}</td><td><span class="status ${status(p)}">${labels[status(p)]}</span><br><small class="hint">운영 상태: ${completionLabels[completionStatus(p)]}</small></td><td class="hint">${operationDetails(p)}</td><td>${(p.teachers ?? []).map(t => esc(t.name) + " <small class=hint>(" + esc(teacherLabel(t.type)) + (t.affiliation ? " · " + esc(t.affiliation) : "") + ")</small>").join("<br>") || "—"}</td></tr>`
   ).join("") || '<tr><td colspan="12">조건에 맞는 프로그램이 없습니다.</td></tr>';
   $("fundRows").innerHTML = groups(fundingPrograms()).map(g =>
     `<tr><td><button class="edit" data-fund="${esc(g.fund)}">${esc(g.fund)}</button></td><td>${g.items.length}개</td><td>${won(g.budget)}</td><td>${won(g.spent)}</td><td>${won(g.budget-g.spent)}</td><td>${pct(g.spent,g.budget)}</td><td>${g.reached} / ${g.tracked}개</td></tr>`
@@ -239,6 +239,7 @@ function openEdit(id) {
   editing = programs.find(p => p.id === id);
   const record = editing || { name: "", fund: $("fund").value, year: Number(view === "funding" ? $("fundYear").value : $("year").value) || thisYear, part: $(view === "funding" ? "fundPart" : "part").value, lead: $(view === "funding" ? "fundLead" : "lead").value, org: "", budget: 0, spent: 0, target: 0, actual: 0, unit: "", owner: accountName };
   for (const input of $("form").querySelectorAll("[name]")) input.value = record[input.name] ?? "";
+  $("form").elements.completion.value = completionStatus(record);
   updateOrganizationField();
   $("expenses").replaceChildren();
   $("expenseAdd").disabled = false;

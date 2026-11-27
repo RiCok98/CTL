@@ -104,7 +104,7 @@
           id: "sheet-" + parent.sheetId + "-" + row,
           name: r[1], year: Number(r[0]) || 0, fund: String(r[2] ?? ""), part: labels[partIndex],
           lead: String(r[3] ?? ""), org: String(r[4] ?? ""), owner: String(r[5] ?? ""),
-          completion: r[6] === "완료 (O)" ? "done" : r[6] === "미완료 (X)" ? "pending" : "",
+          completion: r[6] === "완료 (O)" ? "done" : r[6] === "미완료 (X)" ? "pending" : "in_progress",
           budget: Number(r[7]) || 0, spent: Number(r[8]) || 0,
           applicants: r[12] ?? null, requestedHours: r[13] ?? null, completions: r[14] ?? null, operatingHours: r[15] ?? null,
           indicatorCategory: String(r[17] ?? ""), indicator: String(r[18] ?? ""), indicatorDetail: String(r[19] ?? ""),

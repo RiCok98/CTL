@@ -25,7 +25,7 @@ function validateOperations(record) {
 const optionalText = (value, limit) => value === undefined ||
   (typeof value === "string" && value.trim().length <= limit);
 function validateMonitoring(record) {
-  return (record.completion === undefined || ["", "done", "pending"].includes(record.completion)) &&
+  return (record.completion === undefined || ["", "done", "pending", "in_progress"].includes(record.completion)) &&
     optionalText(record.indicator, 100) && optionalText(record.indicatorCategory, 60) && optionalText(record.indicatorDetail, 120) &&
     (record.priorActual == null || (Number.isFinite(record.priorActual) && record.priorActual >= 0 && record.priorActual <= 999999999)) &&
     (record.expenses === undefined || (Array.isArray(record.expenses) && record.expenses.length <= 30 &&
@@ -99,7 +99,7 @@ export async function api(request, env, path) {
     for (const field of Object.keys(textLimits)) record[field] = input[field].trim();
     for (const field of Object.keys(maxNumbers)) record[field] = input[field];
     for (const field of [...counts, ...hours]) record[field] = input[field] ?? null;
-    record.completion = input.completion ?? "";
+    record.completion = input.completion || "in_progress";
     record.indicator = input.indicator?.trim() ?? "";
     record.indicatorCategory = input.indicatorCategory?.trim() ?? "";
     record.indicatorDetail = input.indicatorDetail?.trim() ?? "";
