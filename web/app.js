@@ -56,12 +56,12 @@ function selectOptions(select, first, values, defaultValue = "") {
   select.replaceChildren(new Option(first, ""), ...values.map(value => new Option(value, value)));
   select.value = values.map(String).includes(previous) ? previous : "";
 }
-function filteredPrograms() {
+function filteredPrograms({ includeAllParts = false } = {}) {
   const query = $("query").value.trim().toLocaleLowerCase("ko-KR");
   return programs.filter(p =>
     (!$("year").value || p.year === Number($("year").value)) &&
     (!$("fund").value || p.fund === $("fund").value) &&
-    (!$("part").value || p.part === $("part").value) &&
+    (includeAllParts || !$("part").value || p.part === $("part").value) &&
     (!$("lead").value || p.lead === $("lead").value) &&
     matchesCompletion(p, "completionFilter") &&
     (!$("statusFilter").value || status(p) === $("statusFilter").value) &&
@@ -86,6 +86,36 @@ function operationDetails(p) {
     .filter(([, value]) => value != null)
     .map(([label, value, unit]) => label + " " + number(value) + unit).join("<br>") || "—";
 }
+function metricBar(label, numerator, denominator) {
+  const width = denominator ? Math.min(100, numerator / denominator * 100) : 0;
+  return `<div><div class="barlabel"><span>${label}</span><strong>${pct(numerator, denominator)}</strong></div><div class="track"><div class="fill" style="width:${width}%"></div></div></div>`;
+}
+function renderDashboardDetails(items, comparison) {
+  const indicators = items.filter(p => p.indicator && /^(대학AID|대학혁신(?:지원사업)?)$/.test(p.fund));
+  $("indicatorCount").textContent = "총 " + indicators.length + "개 항목";
+  $("indicatorRows").innerHTML = indicators.map(p => `
+    <tr><td>${esc(p.fund)}</td><td>${esc(p.indicatorCategory || "—")}</td>
+    <td><button class="edit" type="button" data-edit="${esc(p.id)}">${esc(p.indicator)}</button><br><small class="hint">${esc(p.name)}</small></td>
+    <td>${esc(p.indicatorDetail || "—")}</td><td>${esc(p.unit)}</td>
+    <td>${p.priorActual == null ? "—" : number(p.priorActual)} <small class="hint">(${p.year - 1})</small></td>
+    <td>${number(p.target)} <small class="hint">(${p.year})</small></td><td>${number(p.actual)}</td>
+    <td>${pct(p.actual, p.priorActual)}</td><td>${pct(p.actual, p.target)}</td></tr>`
+  ).join("") || '<tr><td colspan="10">선택 조건에 맞는 자율성과지표가 없습니다.</td></tr>';
+
+  $("partCompletion").innerHTML = parts.map(part => {
+    const records = comparison.filter(p => p.part === part);
+    const completed = records.filter(p => p.completion === "done").length;
+    const tracked = records.filter(p => p.target > 0);
+    const rates = tracked.reduce((total, p) => total + p.actual / p.target, 0);
+    return `<article class="comparison-card">
+      <div class="barlabel"><strong>${part}</strong><span>완료 ${completed} / ${records.length}건</span></div>
+      <div class="bars">
+        ${metricBar("예산 집행률", sum(records, "spent"), sum(records, "budget"))}
+        ${metricBar("프로그램 완료율", completed, records.length)}
+        ${metricBar("목표 대비 실적 달성률", rates, tracked.length)}
+      </div></article>`;
+  }).join("");
+}
 function render() {
   const years = [...new Set([thisYear, ...programs.map(p => p.year)])].sort((a, b) => b - a);
   const funds = [...new Set([...standardFunds, ...programs.map(p => p.fund)])];
@@ -104,11 +134,8 @@ function render() {
   $("notice").hidden = !messages.length;
 
   const items = filteredPrograms();
-  $("partCompletion").innerHTML = parts.map(part => {
-    const records = items.filter(p => p.part === part);
-    const count = records.filter(p => p.completion === "done").length;
-    return `<div><div class="barlabel"><strong>${part}</strong><span>완료 ${count} / ${records.length}건</span></div><div class="track"><div class="fill" style="width:${records.length ? count / records.length * 100 : 0}%"></div></div></div>`;
-  }).join("");
+  const comparison = filteredPrograms({ includeAllParts: true });
+  renderDashboardDetails(items, comparison);
   const budget = sum(items, "budget");
   const spent = sum(items, "spent");
   const tracked = items.filter(p => p.target > 0);
@@ -149,7 +176,7 @@ function setView(next) {
   $("crumb").textContent = "운영관리 / " + heading[0];
   $("title").textContent = heading[1];
   $("subtitle").textContent = heading[2];
-  $("partPanel").hidden = $("stats").hidden = $("overview").hidden = next !== "dashboard";
+  $("dashboardDetails").hidden = $("stats").hidden = $("overview").hidden = next !== "dashboard";
   $("programPanel").hidden = next === "funding";
   $("fundPanel").hidden = next !== "funding";
   document.querySelectorAll("[data-view]").forEach(b => b.setAttribute("aria-pressed", b.dataset.view === next));
@@ -340,10 +367,10 @@ function csvCell(value) {
   return '"' + raw.replaceAll('"','""') + '"';
 }
 $("export").onclick = () => {
-  const rows = [["사업연도","프로그램","파트","운영 유형","주관 학과·부서명","재원","담당자","편성액","집행액","잔액","집행률","목표값","실적값","단위","달성률","상태","신청인원(명)","신청 운영시간(시간)","이수인원(명)","실제 운영시간(시간)","운영교원·직원","운영 완료 여부","성과·자율지표명","전년도 실적","세부 지출 내역"]];
+  const rows = [["사업연도","프로그램","파트","운영 유형","주관 학과·부서명","재원","담당자","편성액","집행액","잔액","집행률","목표값","실적값","단위","달성률","상태","신청인원(명)","신청 운영시간(시간)","이수인원(명)","실제 운영시간(시간)","운영교원·직원","운영 완료 여부","성과·자율지표명","지표 구분","세부요소 / 산출항목","전년도 실적","세부 지출 내역"]];
   const items = view === "funding" ? fundingPrograms() : filteredPrograms();
   for (const p of items) rows.push([p.year,p.name,p.part,p.lead,p.org,p.fund,p.owner,p.budget,p.spent,p.budget-p.spent,pct(p.spent,p.budget),p.target,p.actual,p.unit,pct(p.actual,p.target),labels[status(p)],...operationFields.map(field => p[field] ?? ""),
-    (p.teachers ?? []).map(t => t.name + " (" + teacherLabel(t.type) + (t.affiliation ? " · " + affiliationLabel(t.type) + " " + t.affiliation : "") + ")").join(" / "), completionLabels[completionStatus(p)], p.indicator ?? "", p.priorActual ?? "",
+    (p.teachers ?? []).map(t => t.name + " (" + teacherLabel(t.type) + (t.affiliation ? " · " + affiliationLabel(t.type) + " " + t.affiliation : "") + ")").join(" / "), completionLabels[completionStatus(p)], p.indicator ?? "", p.indicatorCategory ?? "", p.indicatorDetail ?? "", p.priorActual ?? "",
     (p.expenses ?? []).map(e => e.name + " (" + e.amount + "원)").join(" / ")]);
   const file = new Blob(["\uFEFF" + rows.map(row => row.map(csvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(file);

@@ -22,9 +22,11 @@ function validateOperations(record) {
         teacher.name.trim().length > 0 && teacher.name.trim().length <= 80 && teacherTypes.includes(teacher.type) &&
         (teacher.affiliation === undefined || (typeof teacher.affiliation === "string" && teacher.affiliation.trim().length <= 80)))));
 }
+const optionalText = (value, limit) => value === undefined ||
+  (typeof value === "string" && value.trim().length <= limit);
 function validateMonitoring(record) {
   return (record.completion === undefined || ["", "done", "pending"].includes(record.completion)) &&
-    (record.indicator === undefined || (typeof record.indicator === "string" && record.indicator.trim().length <= 100)) &&
+    optionalText(record.indicator, 100) && optionalText(record.indicatorCategory, 60) && optionalText(record.indicatorDetail, 120) &&
     (record.priorActual == null || (Number.isFinite(record.priorActual) && record.priorActual >= 0 && record.priorActual <= 999999999)) &&
     (record.expenses === undefined || (Array.isArray(record.expenses) && record.expenses.length <= 30 &&
       record.expenses.every(expense => expense && typeof expense.name === "string" &&
@@ -99,6 +101,8 @@ export async function api(request, env, path) {
     for (const field of [...counts, ...hours]) record[field] = input[field] ?? null;
     record.completion = input.completion ?? "";
     record.indicator = input.indicator?.trim() ?? "";
+    record.indicatorCategory = input.indicatorCategory?.trim() ?? "";
+    record.indicatorDetail = input.indicatorDetail?.trim() ?? "";
     record.priorActual = input.priorActual ?? null;
     record.expenses = (input.expenses ?? []).map(({ name, amount }) => ({ name: name.trim(), amount }));
     record.teachers = (input.teachers ?? []).map(({ name, type, affiliation }) => ({ name: name.trim(), type, affiliation: affiliation?.trim() ?? "" }));
