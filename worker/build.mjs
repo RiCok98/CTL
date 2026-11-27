@@ -9,7 +9,7 @@ const mime = {
   svg: "image/svg+xml",
   png: "image/png"
 };
-const files = ["index.html", "app.js", "theme.css", "install.js", "sw.js", "manifest.webmanifest",
+const files = ["index.html", "app.js", "theme.css", "install.js", "google-sheets.js", "sw.js", "manifest.webmanifest",
   "icons/ctl.svg", "icons/ctl-192.png", "icons/ctl-512.png", "icons/ctl-maskable.png", "icons/ctl-touch.png"];
 const assets = Object.fromEntries(await Promise.all(files.map(async path => {
   const extension = path.split(".").at(-1);

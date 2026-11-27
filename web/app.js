@@ -226,6 +226,7 @@ function addExpense(expense = {}) {
 }
 $("expenseAdd").onclick = () => addExpense().querySelector(".expense-name").focus();
 function openEdit(id) {
+  if (window.ctlSheetProgram?.(id)) return;
   editing = programs.find(p => p.id === id);
   const record = editing || { name: "", fund: $("fund").value, year: Number(view === "funding" ? $("fundYear").value : $("year").value) || thisYear, part: $(view === "funding" ? "fundPart" : "part").value, lead: $(view === "funding" ? "fundLead" : "lead").value, org: "", budget: 0, spent: 0, target: 0, actual: 0, unit: "", owner: accountName };
   for (const input of $("form").querySelectorAll("[name]")) input.value = record[input.name] ?? "";
@@ -383,6 +384,7 @@ $("export").onclick = () => {
 async function initialize() {
   try {
     const response = await fetch("/api/programs", { headers: { Accept: "application/json" } });
+    if (window.ctlSheetActive) return;
     if (response.status === 404 && !response.headers.get("Content-Type")?.includes("application/json")) {
       $("storageMode").textContent = "데이터는 이 브라우저에 저장됩니다.";
     } else {
@@ -398,6 +400,7 @@ async function initialize() {
     }
     $("add").disabled = false;
   } catch {
+    if (window.ctlSheetActive) return;
     programs = [];
     $("storageMode").textContent = "공유 저장소 연결 실패";
     storageError = "공유 저장소를 불러오지 못했습니다. 사이트에 로그인한 뒤 새로고침하세요.";
