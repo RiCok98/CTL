@@ -92,3 +92,9 @@ dialog::backdrop { background: #102e2990; }
   .teacher-row { grid-template-columns: 1fr 1fr; }
   .teacher-remove { grid-column: 2; justify-self: end; }
 }
+
+.expense-row { grid-template-columns: 1fr 1fr auto; }
+@media(max-width: 450px) {
+  .expense-row { grid-template-columns: 1fr 1fr; }
+  .expense-remove { grid-column: 2; justify-self: end; }
+}

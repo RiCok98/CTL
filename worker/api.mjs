@@ -22,6 +22,15 @@ function validateOperations(record) {
         teacher.name.trim().length > 0 && teacher.name.trim().length <= 80 && teacherTypes.includes(teacher.type) &&
         (teacher.affiliation === undefined || (typeof teacher.affiliation === "string" && teacher.affiliation.trim().length <= 80)))));
 }
+function validateMonitoring(record) {
+  return (record.completion === undefined || ["", "done", "pending"].includes(record.completion)) &&
+    (record.indicator === undefined || (typeof record.indicator === "string" && record.indicator.trim().length <= 100)) &&
+    (record.priorActual == null || (Number.isFinite(record.priorActual) && record.priorActual >= 0 && record.priorActual <= 999999999)) &&
+    (record.expenses === undefined || (Array.isArray(record.expenses) && record.expenses.length <= 30 &&
+      record.expenses.every(expense => expense && typeof expense.name === "string" &&
+        expense.name.trim().length > 0 && expense.name.trim().length <= 100 &&
+        Number.isSafeInteger(expense.amount) && expense.amount >= 0 && expense.amount <= 999999999999)));
+}
 function validate(record) {
   if (!record || !parts.includes(record.part) || !leads.includes(record.lead) ||
       !Number.isInteger(record.year) || record.year < 1900 || record.year > 9999) return false;
@@ -30,7 +39,7 @@ function validate(record) {
     (!required.includes(field) || record[field].trim().length > 0)) &&
     Object.entries(maxNumbers).every(([field, max]) =>
       Number.isFinite(record[field]) && record[field] >= 0 && record[field] <= max) &&
-    Number.isInteger(record.budget) && Number.isInteger(record.spent) && validateOperations(record);
+    Number.isInteger(record.budget) && Number.isInteger(record.spent) && validateOperations(record) && validateMonitoring(record);
 }
 
 export async function api(request, env, path) {
@@ -79,7 +88,7 @@ export async function api(request, env, path) {
   const deleted = request.method === "DELETE";
   if (!deleted) {
     const body = await request.text();
-    if (body.length > 12000) return json({ error: "입력 내용이 너무 깁니다." }, 413);
+    if (body.length > 24000) return json({ error: "입력 내용이 너무 깁니다." }, 413);
     let input;
     try { input = JSON.parse(body); } catch { return json({ error: "입력 형식이 올바르지 않습니다." }, 400); }
     if (!validate(input)) return json({ error: "파트, 운영 유형, 담당자와 프로그램 항목을 확인하세요." }, 400);
@@ -88,6 +97,10 @@ export async function api(request, env, path) {
     for (const field of Object.keys(textLimits)) record[field] = input[field].trim();
     for (const field of Object.keys(maxNumbers)) record[field] = input[field];
     for (const field of [...counts, ...hours]) record[field] = input[field] ?? null;
+    record.completion = input.completion ?? "";
+    record.indicator = input.indicator?.trim() ?? "";
+    record.priorActual = input.priorActual ?? null;
+    record.expenses = (input.expenses ?? []).map(({ name, amount }) => ({ name: name.trim(), amount }));
     record.teachers = (input.teachers ?? []).map(({ name, type, affiliation }) => ({ name: name.trim(), type, affiliation: affiliation?.trim() ?? "" }));
   }
   const stored = await env.BUCKET.put(key, JSON.stringify(record ?? { id }), {
