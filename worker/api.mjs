@@ -28,13 +28,13 @@ function validateAdditionalIndicators(indicators) {
   return indicators === undefined || (Array.isArray(indicators) && indicators.length <= 15 &&
     indicators.every(i => i && typeof i.indicator === "string" && i.indicator.trim() &&
       typeof i.unit === "string" && i.unit.trim() && optionalText(i.indicator, 100) &&
-      optionalText(i.unit, 20) && optionalText(i.indicatorCategory, 60) && optionalText(i.indicatorDetail, 120) &&
+      optionalText(i.unit, 20) && optionalText(i.indicatorCategory, 60) && optionalText(i.indicatorDetail, 120) && optionalText(i.indicatorNote, 500) &&
       [i.target, i.actual].every(value => Number.isFinite(value) && value >= 0 && value <= 999999999) &&
       (i.priorActual == null || (Number.isFinite(i.priorActual) && i.priorActual >= 0 && i.priorActual <= 999999999))));
 }
 function validateMonitoring(record) {
   return validateAdditionalIndicators(record.extraIndicators) && (record.completion === undefined || ["", "done", "pending", "in_progress"].includes(record.completion)) &&
-    optionalText(record.indicator, 100) && optionalText(record.indicatorCategory, 60) && optionalText(record.indicatorDetail, 120) &&
+    optionalText(record.indicator, 100) && optionalText(record.indicatorCategory, 60) && optionalText(record.indicatorDetail, 120) && optionalText(record.indicatorNote, 500) &&
     (record.priorActual == null || (Number.isFinite(record.priorActual) && record.priorActual >= 0 && record.priorActual <= 999999999)) &&
     (record.expenses === undefined || (Array.isArray(record.expenses) && record.expenses.length <= 30 &&
       record.expenses.every(expense => expense && typeof expense.name === "string" &&
@@ -98,7 +98,7 @@ export async function api(request, env, path) {
   const deleted = request.method === "DELETE";
   if (!deleted) {
     const body = await request.text();
-    if (body.length > 48000) return json({ error: "입력 내용이 너무 깁니다." }, 413);
+    if (body.length > 96000) return json({ error: "입력 내용이 너무 깁니다." }, 413);
     let input;
     try { input = JSON.parse(body); } catch { return json({ error: "입력 형식이 올바르지 않습니다." }, 400); }
     if (!validate(input)) return json({ error: "파트, 운영 유형, 담당자와 프로그램 항목을 확인하세요." }, 400);
@@ -110,10 +110,11 @@ export async function api(request, env, path) {
     record.completion = input.completion || "in_progress";
     record.extraIndicators = (input.extraIndicators ?? []).map(i => ({
       indicator: i.indicator.trim(), unit: i.unit.trim(), indicatorCategory: i.indicatorCategory?.trim() ?? "",
-      indicatorDetail: i.indicatorDetail?.trim() ?? "", target: i.target, actual: i.actual, priorActual: i.priorActual ?? null
+      indicatorDetail: i.indicatorDetail?.trim() ?? "", indicatorNote: i.indicatorNote?.trim() ?? "", target: i.target, actual: i.actual, priorActual: i.priorActual ?? null
     }));
     record.indicator = input.indicator?.trim() ?? "";
     record.indicatorCategory = input.indicatorCategory?.trim() ?? "";
+    record.indicatorNote = input.indicatorNote?.trim() ?? "";
     record.indicatorDetail = input.indicatorDetail?.trim() ?? "";
     record.priorActual = input.priorActual ?? null;
     record.expenses = (input.expenses ?? []).map(({ name, amount }) => ({ name: name.trim(), amount }));

@@ -109,3 +109,6 @@ dialog::backdrop { background: #102e2990; }
 
 .extra-indicator { margin: 0 0 10px; padding: 12px; }
 .extra-indicator .fields { margin: 0 0 8px; }
+
+textarea { width: 100%; resize: vertical; border: 1px solid #d3e0d8; border-radius: 8px; background: #fff; color: var(--ink); font: inherit; padding: 9px; }
+textarea:focus-visible { outline: 2px solid #28866b; outline-offset: 2px; }

@@ -25,7 +25,7 @@
 <div id="dashboardDetails">
 <section class="panel">
 <div class="row"><h2>자율성과지표 관리 <span class="hint">대학AID · 대학혁신</span></h2><span class="hint" id="indicatorCount"></span></div>
-<div class="tablewrap"><table><thead><tr><th>사업재원</th><th>구분</th><th>지표명</th><th>세부요소 / 산출항목</th><th>단위</th><th>전년도 실적</th><th>당해연도 목표</th><th>당해연도 실적</th><th>전년도 대비</th><th>목표 대비</th></tr></thead><tbody id="indicatorRows"></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>사업재원</th><th>구분</th><th>지표명</th><th>비고</th><th>단위</th><th>전년도 실적</th><th>당해연도 목표</th><th>당해연도 실적</th><th>전년도 대비</th><th>목표 대비</th></tr></thead><tbody id="indicatorRows"></tbody></table></div>
 </section>
 <section class="panel">
 <div class="row"><h2>파트별 전체 시각화</h2><span class="hint">목표 대비 달성률은 프로그램별 달성률의 평균</span></div>
@@ -73,9 +73,9 @@
 </form>
 </dialog>
 <dialog id="dialog" aria-labelledby="dialogTitle"><form id="form"><div class="row"><h2 id="dialogTitle"></h2><button class="secondary" type="button" id="close" aria-label="닫기">✕</button></div><div class="fields"><label class="wide">프로그램명<input name="name" required maxlength="100"></label><label>파트<select name="part" required><option value="">선택</option><option>교원파트</option><option>학습파트</option><option>원격파트</option></select></label><label>운영 유형<select name="lead" required><option value="">선택</option><option>학과주도</option><option>부서주도</option><option>기타</option></select></label><label class="wide" id="orgField"><span id="orgLabel">주관 학과·부서명</span><input name="org" maxlength="80"></label><label>재원<input name="fund" list="fundOptions" required maxlength="60"><datalist id="fundOptions"></datalist></label><label>사업연도<input name="year" type="number" min="1900" max="9999" required></label><label>예산 편성액 (원)<input name="budget" type="number" min="0" max="999999999999" step="1" required></label><label id="legacySpent" hidden>기존 지출액 (원)<input name="spent" type="number" min="0" max="999999999999" step="1" required></label><label>운영 완료 여부<select name="completion"><option value="in_progress">운영중</option><option value="done">완료 (O)</option><option value="pending">미완료 (X)</option></select></label>
-<label>기본 성과·자율지표명<input name="indicator" maxlength="100"></label>
-<label>지표 구분<input name="indicatorCategory" maxlength="60"></label><label class="wide">세부요소 / 산출항목<input name="indicatorDetail" maxlength="120"></label><label>전년도 실적<input name="priorActual" type="number" min="0" max="999999999" step="any"></label>
-<label>당해연도 목표값<input name="target" type="number" min="0" max="999999999" step="any" required></label><label>당해연도 실적값<input name="actual" type="number" min="0" max="999999999" step="any" required></label><label>성과 단위<input name="unit" placeholder="예: 명, 건, 점" maxlength="20" required></label><label>담당자<input name="owner" maxlength="80" required></label></div>
+<label>성과지표명<input name="indicator" maxlength="100" placeholder="예: 참여시간"></label>
+<input name="indicatorCategory" type="hidden"><input name="indicatorDetail" type="hidden"><input name="priorActual" type="hidden">
+<label>목표값<input name="target" inputmode="decimal" maxlength="16" placeholder="예: 2,400" required></label><label>달성값<input name="actual" inputmode="decimal" maxlength="16" placeholder="예: 4,188" required></label><label>성과 단위<input name="unit" placeholder="예: 시간, 명, 건" maxlength="20" required></label><label class="wide">비고<textarea name="indicatorNote" maxlength="500" rows="2" placeholder="예: 추진실적·계획"></textarea></label><label>담당자<input name="owner" maxlength="80" required></label></div>
 <fieldset class="detail-section"><legend>추가 성과지표</legend>
 <div id="extraIndicators"></div>
 <button id="indicatorAdd" type="button" class="secondary">＋ 성과지표 추가</button>
@@ -84,12 +84,12 @@
 <div class="fields">
 <label>지표명<input data-indicator="indicator" maxlength="100" required></label>
 <label>성과 단위<input data-indicator="unit" maxlength="20" required></label>
-<label>지표 구분<input data-indicator="indicatorCategory" maxlength="60"></label>
-<label>세부요소 / 산출항목<input data-indicator="indicatorDetail" maxlength="120"></label>
-<label>전년도 실적<input data-indicator="priorActual" type="number" min="0" max="999999999" step="any"></label>
-<label>당해연도 목표값<input data-indicator="target" type="number" min="0" max="999999999" step="any" required></label>
-<label>당해연도 실적값<input data-indicator="actual" type="number" min="0" max="999999999" step="any" required></label>
-</div><button class="secondary danger indicator-remove" type="button">이 지표 삭제</button>
+<input data-indicator="indicatorCategory" type="hidden">
+<input data-indicator="indicatorDetail" type="hidden">
+<input data-indicator="priorActual" type="hidden">
+<label>목표값<input data-indicator="target" inputmode="decimal" maxlength="16" placeholder="예: 2,400" required></label>
+<label>달성값<input data-indicator="actual" inputmode="decimal" maxlength="16" placeholder="예: 4,188" required></label>
+<label class="wide">비고<textarea data-indicator="indicatorNote" maxlength="500" rows="2" placeholder="예: 추진실적·계획"></textarea></label></div><button class="secondary danger indicator-remove" type="button">이 지표 삭제</button>
 </div></template>
 <fieldset class="detail-section" id="legacyExpenses" hidden><legend>세부 지출 내역</legend>
 <p class="hint" style="margin-bottom:8px">항목별 지출을 기록합니다. 위 지출액은 따로 입력할 수 있습니다.</p>

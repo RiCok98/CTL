@@ -136,7 +136,7 @@ function renderDashboardDetails(items, comparison) {
   $("indicatorRows").innerHTML = indicators.map(p => `
     <tr><td>${esc(p.fund)}</td><td>${esc(p.indicatorCategory || "—")}</td>
     <td><button class="edit" type="button" data-edit="${esc(p.id)}">${esc(p.indicator)}</button><br><small class="hint">${esc(p.name)}</small></td>
-    <td>${esc(p.indicatorDetail || "—")}</td><td>${esc(p.unit)}</td>
+    <td>${esc(p.indicatorNote || p.indicatorDetail || "—")}</td><td>${esc(p.unit)}</td>
     <td>${p.priorActual == null ? "—" : number(p.priorActual)} <small class="hint">(${p.year - 1})</small></td>
     <td>${number(p.target)} <small class="hint">(${p.year})</small></td><td>${number(p.actual)}</td>
     <td>${pct(p.actual, p.priorActual)}</td><td>${pct(p.actual, p.target)}</td></tr>`
@@ -208,7 +208,8 @@ function render() {
     `<tr><td><button class="edit" type="button" data-edit="${esc(p.id)}">${esc(p.name)}</button><br><small class="hint">${p.year}${p.owner ? " · " + esc(p.owner) : ""}${p.local ? " · 로컬" : ""}</small>${view === "programs" && !shared && !window.ctlSheetActive ? `<br><button type="button" class="edit hint" data-program-operations="${esc(p.id)}">운영 기록 열기</button>` : ""}</td><td>${esc(p.part || "미분류")}</td><td>${esc(p.lead || "미분류")}${p.org ? "<br><small class=hint>" + esc(p.org) + "</small>" : ""}</td><td>${esc(p.fund)}</td><td>${won(p.budget)}</td><td>${won(p.spent)}<br><small class="hint">잔액 ${won(p.budget - p.spent)}</small>${p.expenses?.length ? "<br><small class=hint>세부 " + p.expenses.length + "건</small>" : ""}</td><td>${pct(p.spent,p.budget)}</td><td>${indicatorsFor(p).map((indicator, index) =>
       "<div><b>" + esc(indicator.indicator || "지표 " + (index + 1)) + "</b><br><small class=hint>전년도 " +
       (indicator.priorActual == null ? "—" : number(indicator.priorActual)) + "</small><br>목표 " +
-      number(indicator.target) + " / 실적 " + number(indicator.actual) + " " + esc(indicator.unit) + "</div>"
+      number(indicator.target) + " / 달성 " + number(indicator.actual) + " " + esc(indicator.unit) +
+      (indicator.indicatorNote ? "<br><small class=hint>" + esc(indicator.indicatorNote) + "</small>" : "") + "</div>"
     ).join("")}</td><td>${indicatorsFor(p).map((indicator, index) =>
       "<div>" + (indicatorsFor(p).length > 1 ? esc(indicator.indicator || "지표 " + (index + 1)) + " · " : "") +
       pct(indicator.actual, indicator.target) + "</div>").join("")}</td><td><span class="status ${status(p)}">${labels[status(p)]}</span><br><small class="hint">운영 상태: ${completionLabels[completionStatus(p)]}</small></td><td class="hint">${operationDetails(p)}</td><td>${(p.teachers ?? []).map(t => esc(t.name) + " <small class=hint>(" + esc(teacherLabel(t.type)) + (t.affiliation ? " · " + esc(t.affiliation) : "") + ")</small>").join("<br>") || "—"}</td></tr>`
@@ -367,6 +368,12 @@ async function persist(record, deleted = false) {
   }
 }
 $("dialog").addEventListener("cancel", event => { if (saving) event.preventDefault(); });
+function parseIndicatorNumber(value) {
+  const text = String(value ?? "").trim();
+  if (!/^(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)(?:\.[0-9]+)?$/.test(text)) return NaN;
+  const parsed = Number(text.replaceAll(",", ""));
+  return parsed <= 999999999 ? parsed : NaN;
+}
 $("form").addEventListener("submit", async event => {
   event.preventDefault();
   const p = Object.fromEntries([...new FormData(event.currentTarget)].map(([key, value]) => [key, value.trim()]));
@@ -374,7 +381,13 @@ $("form").addEventListener("submit", async event => {
     setFormError("프로그램명, 재원, 성과 단위, 담당자, 파트와 운영 유형을 입력하세요.");
     return;
   }
-  for (const field of ["year", "budget", "target", "actual"]) p[field] = Number(p[field]);
+  for (const field of ["year", "budget"]) p[field] = Number(p[field]);
+  p.target = parseIndicatorNumber(p.target);
+  p.actual = parseIndicatorNumber(p.actual);
+  if (!Number.isFinite(p.target) || !Number.isFinite(p.actual)) {
+    setFormError("목표값과 달성값에는 2,400처럼 숫자만 입력하세요. 단위는 단위 칸에 입력합니다.");
+    return;
+  }
   p.spent = shared ? Number(p.spent) : editing?.spent ?? 0;
   if (p.lead === "학과주도" && !p.org) {
     setFormError("주관 학과명을 입력하세요.");
@@ -386,12 +399,16 @@ $("form").addEventListener("submit", async event => {
     const indicator = Object.fromEntries([...row.querySelectorAll("[data-indicator]")]
       .map(field => [field.dataset.indicator, field.value.trim()]));
     indicator.priorActual = indicator.priorActual === "" ? null : Number(indicator.priorActual);
-    indicator.target = Number(indicator.target);
-    indicator.actual = Number(indicator.actual);
+    indicator.target = parseIndicatorNumber(indicator.target);
+    indicator.actual = parseIndicatorNumber(indicator.actual);
     return indicator;
   });
   if (p.extraIndicators.some(indicator => !indicator.indicator || !indicator.unit)) {
     setFormError("추가 성과지표의 지표명과 단위를 입력하세요.");
+    return;
+  }
+  if (p.extraIndicators.some(indicator => !Number.isFinite(indicator.target) || !Number.isFinite(indicator.actual))) {
+    setFormError("추가 성과지표의 목표값과 달성값은 숫자로 입력하세요.");
     return;
   }
   p.expenses = !shared ? (editing?.expenses ?? []) : [...$("expenses").children].map(row => ({
@@ -473,13 +490,14 @@ $("export").onclick = () => {
     downloadCsv(operationCsvRows(), "CTL-운영기록.csv");
     return;
   }
-  const rows = [["사업연도","프로그램","파트","운영 유형","주관 학과·부서명","재원","담당자","편성액","집행액","잔액","집행률","목표값","실적값","단위","달성률","상태","신청인원(명)","신청 운영시간(시간)","이수인원(명)","실제 운영시간(시간)","운영교원·직원","운영 완료 여부","성과·자율지표명","지표 구분","세부요소 / 산출항목","전년도 실적","세부 지출 내역","추가 성과지표"]];
+  const rows = [["사업연도","프로그램","파트","운영 유형","주관 학과·부서명","재원","담당자","편성액","집행액","잔액","집행률","목표값","실적값","단위","달성률","상태","신청인원(명)","신청 운영시간(시간)","이수인원(명)","실제 운영시간(시간)","운영교원·직원","운영 완료 여부","성과·자율지표명","지표 구분","세부요소 / 산출항목","전년도 실적","세부 지출 내역","성과지표 비고","추가 성과지표"]];
   const items = view === "funding" ? fundingPrograms() : filteredPrograms();
   for (const p of items) rows.push([p.year,p.name,p.part,p.lead,p.org,p.fund,p.owner,p.budget,p.spent,p.budget-p.spent,pct(p.spent,p.budget),p.target,p.actual,p.unit,pct(p.actual,p.target),labels[status(p)],...operationFields.map(field => p[field] ?? ""),
     (p.teachers ?? []).map(t => t.name + " (" + teacherLabel(t.type) + (t.affiliation ? " · " + affiliationLabel(t.type) + " " + t.affiliation : "") + ")").join(" / "), completionLabels[completionStatus(p)], p.indicator ?? "", p.indicatorCategory ?? "", p.indicatorDetail ?? "", p.priorActual ?? "",
     (p.expenses ?? []).map(e => e.name + " (" + e.amount + "원)").join(" / "),
+    p.indicatorNote ?? "",
     (p.extraIndicators ?? []).map(i => i.indicator + " · " + i.unit + " · 전년도 " + (i.priorActual ?? "—") +
-      " · 목표 " + i.target + " · 실적 " + i.actual + " · " + pct(i.actual, i.target)).join("\n")]);
+      " · 목표 " + i.target + " · 실적 " + i.actual + " · " + pct(i.actual, i.target) + (i.indicatorNote ? " · 비고 " + i.indicatorNote : "")).join("\n")]);
   downloadCsv(rows, "CTL-프로그램현황.csv");
 };
 function downloadCsv(rows, filename) {
