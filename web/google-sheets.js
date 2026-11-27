@@ -77,7 +77,16 @@
     return result.valueRanges.flatMap((range, partIndex) => {
       const title = tabNames[partIndex];
       const parent = tabs.find(tab => tab.title === title);
-      return (range.values ?? []).flatMap((r, index) => {
+      const [headers, ...rows] = range.values ?? [];
+      const compact = headers?.[3] === "프로그램코드" && headers?.[10] === "상세 탭 이름";
+      return rows.flatMap((source, index) => {
+        let r = source;
+        if (compact) {
+          r = Array(27).fill("");
+          for (const [original, summary] of [[0,0],[1,1],[2,2],[3,4],[6,5],[7,6],[8,7],[22,11],[23,12],[26,10]]) {
+            r[original] = source[summary] ?? "";
+          }
+        }
         if (typeof r[1] !== "string" || !r[1].trim() || r[1] === "#REF!") return [];
         const row = index + 5;
         const roomId = links.get(title + ":" + row);
@@ -123,7 +132,7 @@
         const endRow = Math.min(503, rowCount);
         const endColumn = columnCount >= 27 ? "AA" : String.fromCharCode(64 + columnCount);
         readableParts.push(tab.title);
-        rangeQuery.append("ranges", quoteTab(tab.title) + "!A5:" + endColumn + endRow);
+        rangeQuery.append("ranges", quoteTab(tab.title) + "!A4:" + endColumn + endRow);
         if (columnCount >= 27) {
           metadataQuery.append("ranges", quoteTab(tab.title) + "!AA5:AA" + endRow);
         }
@@ -268,7 +277,7 @@
     try {
       const headerRange = encodeURIComponent(quoteTab(record.room.title) + "!D3:F3");
       const header = await googleApi("/values/" + headerRange);
-      if (header.values?.[0]?.join("|") !== "지출일|지출 항목|금액 (원)") {
+      if (!["지출일|지출 항목|금액 (원)", "지출일|집행항목|금액 (원)"].includes(header.values?.[0]?.join("|"))) {
         throw new Error("상세 탭에서 지출 표를 찾을 수 없습니다.");
       }
       const dateSerial = (Date.parse(date + "T00:00:00Z") - Date.UTC(1899, 11, 30)) / 86400000;
