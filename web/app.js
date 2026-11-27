@@ -158,8 +158,10 @@ function renderDashboardDetails(items, comparison) {
   }).join("");
 }
 function render() {
-  $("add").hidden = view !== "programs" || !!window.ctlSheetActive;
-  $("export").hidden = view !== "programs";
+  $("add").hidden = !["programs", "operations"].includes(view) || !!window.ctlSheetActive;
+  $("export").hidden = !["programs", "operations"].includes(view);
+  $("export").textContent = view === "operations" ? "운영 기록 CSV 내보내기" : "CSV 내보내기";
+  $("export").disabled = view === "operations" && (shared || !!window.ctlSheetActive);
   const years = [...new Set([thisYear, ...programs.map(p => p.year)])].sort((a, b) => b - a);
   const funds = [...new Set([...standardFunds, ...programs.map(p => p.fund)])];
   selectOptions($("year"), "전체 연도", years, String(thisYear));
@@ -294,16 +296,18 @@ $("indicatorAdd").onclick = () => addIndicator().querySelector("input").focus();
 function openEdit(id) {
   if (window.ctlSheetProgram?.(id)) return;
   editing = programs.find(p => p.id === id);
-  const record = editing || { name: "", fund: $("fund").value, year: Number(view === "funding" ? $("fundYear").value : $("year").value) || thisYear, part: $(view === "funding" ? "fundPart" : "part").value, lead: $(view === "funding" ? "fundLead" : "lead").value, org: "", budget: 0, spent: 0, target: 0, actual: 0, unit: "", owner: accountName };
+  const record = editing || { name: "", fund: $("fund").value, year: Number(view === "funding" ? $("fundYear").value : $("year").value) || thisYear, part: $(view === "operations" ? "operationPart" : view === "funding" ? "fundPart" : "part").value, lead: $(view === "funding" ? "fundLead" : "lead").value, org: "", budget: 0, spent: 0, target: 0, actual: 0, unit: "", owner: accountName };
   for (const input of $("form").querySelectorAll("[name]")) input.value = record[input.name] ?? "";
   $("form").elements.completion.value = completionStatus(record);
   updateOrganizationField();
   $("extraIndicators").replaceChildren();
   $("indicatorAdd").disabled = false;
   for (const indicator of record.extraIndicators ?? []) addIndicator(indicator);
+  $("legacySpent").hidden = $("legacyExpenses").hidden = !shared;
+  $("form").elements.spent.disabled = !shared;
   $("expenses").replaceChildren();
   $("expenseAdd").disabled = false;
-  for (const expense of record.expenses ?? []) addExpense(expense);
+  if (shared) for (const expense of record.expenses ?? []) addExpense(expense);
   $("teachers").replaceChildren();
   $("teacherAdd").disabled = false;
   for (const teacher of record.teachers ?? []) addTeacher(teacher);
@@ -370,7 +374,8 @@ $("form").addEventListener("submit", async event => {
     setFormError("프로그램명, 재원, 성과 단위, 담당자, 파트와 운영 유형을 입력하세요.");
     return;
   }
-  for (const field of ["year", "budget", "spent", "target", "actual"]) p[field] = Number(p[field]);
+  for (const field of ["year", "budget", "target", "actual"]) p[field] = Number(p[field]);
+  p.spent = shared ? Number(p.spent) : editing?.spent ?? 0;
   if (p.lead === "학과주도" && !p.org) {
     setFormError("주관 학과명을 입력하세요.");
     return;
@@ -389,7 +394,7 @@ $("form").addEventListener("submit", async event => {
     setFormError("추가 성과지표의 지표명과 단위를 입력하세요.");
     return;
   }
-  p.expenses = [...$("expenses").children].map(row => ({
+  p.expenses = !shared ? (editing?.expenses ?? []) : [...$("expenses").children].map(row => ({
     name: row.querySelector(".expense-name").value.trim(),
     amount: Number(row.querySelector(".expense-amount").value)
   }));
@@ -418,7 +423,11 @@ $("form").addEventListener("submit", async event => {
       if ($(id).value && $(id).value !== String(value)) $(id).value = "";
     }
     if (!editing) { $("query").value = ""; $("statusFilter").value = ""; }
-    setView(view === "funding" ? "programs" : view);
+    if (view === "operations") {
+      showProgramOperations(p);
+    } else {
+      setView(view === "funding" ? "programs" : view);
+    }
   }
 });
 $("remove").onclick = async () => {
@@ -439,13 +448,7 @@ document.addEventListener("click", event => {
   if (button.dataset.edit) openEdit(button.dataset.edit);
   if (button.dataset.programOperations) {
     const program = programs.find(item => item.id === button.dataset.programOperations);
-    if (program) {
-      setView("operations");
-      $("operationPart").value = parts.includes(program.part) ? program.part : "";
-      renderOperations();
-      $("operationProgram").value = program.id;
-      renderOperations();
-    }
+    if (program) showProgramOperations(program);
   }
   if (button.dataset.fund) {
     $("fund").value = button.dataset.fund;
@@ -466,6 +469,10 @@ function csvCell(value) {
   return '"' + raw.replaceAll('"','""') + '"';
 }
 $("export").onclick = () => {
+  if (view === "operations") {
+    downloadCsv(operationCsvRows(), "CTL-운영기록.csv");
+    return;
+  }
   const rows = [["사업연도","프로그램","파트","운영 유형","주관 학과·부서명","재원","담당자","편성액","집행액","잔액","집행률","목표값","실적값","단위","달성률","상태","신청인원(명)","신청 운영시간(시간)","이수인원(명)","실제 운영시간(시간)","운영교원·직원","운영 완료 여부","성과·자율지표명","지표 구분","세부요소 / 산출항목","전년도 실적","세부 지출 내역","추가 성과지표"]];
   const items = view === "funding" ? fundingPrograms() : filteredPrograms();
   for (const p of items) rows.push([p.year,p.name,p.part,p.lead,p.org,p.fund,p.owner,p.budget,p.spent,p.budget-p.spent,pct(p.spent,p.budget),p.target,p.actual,p.unit,pct(p.actual,p.target),labels[status(p)],...operationFields.map(field => p[field] ?? ""),
@@ -473,14 +480,31 @@ $("export").onclick = () => {
     (p.expenses ?? []).map(e => e.name + " (" + e.amount + "원)").join(" / "),
     (p.extraIndicators ?? []).map(i => i.indicator + " · " + i.unit + " · 전년도 " + (i.priorActual ?? "—") +
       " · 목표 " + i.target + " · 실적 " + i.actual + " · " + pct(i.actual, i.target)).join("\n")]);
+  downloadCsv(rows, "CTL-프로그램현황.csv");
+};
+function downloadCsv(rows, filename) {
   const file = new Blob(["\uFEFF" + rows.map(row => row.map(csvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(file);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "CTL-프로그램현황.csv";
+  link.download = filename;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-};
+}
+function operationCsvRows() {
+  const rows = [["사업연도", "파트", "프로그램", "날짜", "유형", "항목·회차", "지출액(원)", "이수인원(명)", "이수·운영시간(시간)"]];
+  const selectedPart = $("operationPart").value;
+  const selectedId = $("operationProgram").value;
+  for (const program of programs) {
+    if ((selectedPart && selectedPart !== program.part) || (selectedId && selectedId !== program.id)) continue;
+    for (const record of programOperations(program.id)) {
+      const expense = record.kind === "expense";
+      rows.push([program.year, program.part, program.name, record.date, expense ? "지출" : "운영 실적",
+        record.label, expense ? record.amount : "", expense ? "" : record.people, expense ? "" : record.hours]);
+    }
+  }
+  return rows;
+}
 async function initialize() {
   try {
     const response = await fetch("/api/programs", { headers: { Accept: "application/json" } });
@@ -507,6 +531,13 @@ async function initialize() {
   }
   render();
 }
+function showProgramOperations(program) {
+  setView("operations");
+  $("operationPart").value = parts.includes(program.part) ? program.part : "";
+  renderOperations();
+  $("operationProgram").value = program.id;
+  renderOperations();
+}
 function renderOperations() {
   const local = !shared && !window.ctlSheetActive;
   selectOptions($("operationPart"), "전체 파트", parts);
@@ -523,6 +554,8 @@ function renderOperations() {
     !choices.length ? "프로그램 관리에서 프로그램을 먼저 등록해 주세요." :
     "운영 기록은 이 브라우저에 저장됩니다. 이수인원은 회차별 연인원으로 집계합니다.";
   const total = program && programTotals(program);
+  $("operationOpening").textContent = local && program?.spent ?
+    "기존 집행액 " + won(program.spent) + "이 누적 합계에 포함되어 있습니다." : "";
   $("operationTotals").textContent = total ?
     "누적 집행 " + won(total.spent) + " · 이수 " + number(total.completions ?? 0) +
     "명 · 이수·운영 " + number(total.operatingHours ?? 0) + "시간" : "";

@@ -9,7 +9,7 @@
 <section class="panel" id="operationPanel" hidden>
 <div class="row"><h2>운영 기록</h2><div class="filters"><select id="operationPart" aria-label="파트"></select><select id="operationProgram" aria-label="프로그램"></select></div></div>
 <p id="operationNotice" class="hint" role="status"></p>
-<div id="operationTotals" class="row" style="margin-top:12px"></div>
+<div id="operationTotals" class="row" style="margin-top:12px"></div><p id="operationOpening" class="hint"></p>
 <form id="operationForm" hidden>
 <div class="fields">
 <label>기록 유형<select id="operationKind" name="kind"><option value="expense">지출</option><option value="session">운영 실적</option></select></label>
@@ -72,7 +72,7 @@
 <div id="aiResult" tabindex="0" aria-label="AI 분석 결과" style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65;max-height:45vh;overflow:auto;margin-top:12px" hidden></div>
 </form>
 </dialog>
-<dialog id="dialog" aria-labelledby="dialogTitle"><form id="form"><div class="row"><h2 id="dialogTitle"></h2><button class="secondary" type="button" id="close" aria-label="닫기">✕</button></div><div class="fields"><label class="wide">프로그램명<input name="name" required maxlength="100"></label><label>파트<select name="part" required><option value="">선택</option><option>교원파트</option><option>학습파트</option><option>원격파트</option></select></label><label>운영 유형<select name="lead" required><option value="">선택</option><option>학과주도</option><option>부서주도</option><option>기타</option></select></label><label class="wide" id="orgField"><span id="orgLabel">주관 학과·부서명</span><input name="org" maxlength="80"></label><label>재원<input name="fund" list="fundOptions" required maxlength="60"><datalist id="fundOptions"></datalist></label><label>사업연도<input name="year" type="number" min="1900" max="9999" required></label><label>예산 편성액 (원)<input name="budget" type="number" min="0" max="999999999999" step="1" required></label><label>기존 지출액 (원)<input name="spent" type="number" min="0" max="999999999999" step="1" required></label><label>운영 완료 여부<select name="completion"><option value="in_progress">운영중</option><option value="done">완료 (O)</option><option value="pending">미완료 (X)</option></select></label>
+<dialog id="dialog" aria-labelledby="dialogTitle"><form id="form"><div class="row"><h2 id="dialogTitle"></h2><button class="secondary" type="button" id="close" aria-label="닫기">✕</button></div><div class="fields"><label class="wide">프로그램명<input name="name" required maxlength="100"></label><label>파트<select name="part" required><option value="">선택</option><option>교원파트</option><option>학습파트</option><option>원격파트</option></select></label><label>운영 유형<select name="lead" required><option value="">선택</option><option>학과주도</option><option>부서주도</option><option>기타</option></select></label><label class="wide" id="orgField"><span id="orgLabel">주관 학과·부서명</span><input name="org" maxlength="80"></label><label>재원<input name="fund" list="fundOptions" required maxlength="60"><datalist id="fundOptions"></datalist></label><label>사업연도<input name="year" type="number" min="1900" max="9999" required></label><label>예산 편성액 (원)<input name="budget" type="number" min="0" max="999999999999" step="1" required></label><label id="legacySpent" hidden>기존 지출액 (원)<input name="spent" type="number" min="0" max="999999999999" step="1" required></label><label>운영 완료 여부<select name="completion"><option value="in_progress">운영중</option><option value="done">완료 (O)</option><option value="pending">미완료 (X)</option></select></label>
 <label>기본 성과·자율지표명<input name="indicator" maxlength="100"></label>
 <label>지표 구분<input name="indicatorCategory" maxlength="60"></label><label class="wide">세부요소 / 산출항목<input name="indicatorDetail" maxlength="120"></label><label>전년도 실적<input name="priorActual" type="number" min="0" max="999999999" step="any"></label>
 <label>당해연도 목표값<input name="target" type="number" min="0" max="999999999" step="any" required></label><label>당해연도 실적값<input name="actual" type="number" min="0" max="999999999" step="any" required></label><label>성과 단위<input name="unit" placeholder="예: 명, 건, 점" maxlength="20" required></label><label>담당자<input name="owner" maxlength="80" required></label></div>
@@ -91,7 +91,7 @@
 <label>당해연도 실적값<input data-indicator="actual" type="number" min="0" max="999999999" step="any" required></label>
 </div><button class="secondary danger indicator-remove" type="button">이 지표 삭제</button>
 </div></template>
-<fieldset class="detail-section"><legend>세부 지출 내역</legend>
+<fieldset class="detail-section" id="legacyExpenses" hidden><legend>세부 지출 내역</legend>
 <p class="hint" style="margin-bottom:8px">항목별 지출을 기록합니다. 위 지출액은 따로 입력할 수 있습니다.</p>
 <div id="expenses"></div><button id="expenseAdd" class="secondary" type="button">＋ 지출 항목 추가</button>
 </fieldset>
