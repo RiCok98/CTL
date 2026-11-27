@@ -148,6 +148,8 @@ function renderDashboardDetails(items, comparison) {
   }).join("");
 }
 function render() {
+  $("add").hidden = view !== "programs" || !!window.ctlSheetActive;
+  $("export").hidden = view !== "programs";
   const years = [...new Set([thisYear, ...programs.map(p => p.year)])].sort((a, b) => b - a);
   const funds = [...new Set([...standardFunds, ...programs.map(p => p.fund)])];
   selectOptions($("year"), "전체 연도", years, String(thisYear));
@@ -191,7 +193,7 @@ function render() {
   ).join("") || '<p class="empty">목표 미달 프로그램이 없습니다.</p>';
   $("count").textContent = "· " + items.length + "개";
   $("rows").innerHTML = items.map(p =>
-    `<tr><td><button class="edit" type="button" data-edit="${esc(p.id)}">${esc(p.name)}</button><br><small class="hint">${p.year}${p.owner ? " · " + esc(p.owner) : ""}${p.local ? " · 로컬" : ""}</small></td><td>${esc(p.part || "미분류")}</td><td>${esc(p.lead || "미분류")}${p.org ? "<br><small class=hint>" + esc(p.org) + "</small>" : ""}</td><td>${esc(p.fund)}</td><td>${won(p.budget)}</td><td>${won(p.spent)}<br><small class="hint">잔액 ${won(p.budget - p.spent)}</small>${p.expenses?.length ? "<br><small class=hint>세부 " + p.expenses.length + "건</small>" : ""}</td><td>${pct(p.spent,p.budget)}</td><td>${p.indicator ? "<b>" + esc(p.indicator) + "</b><br>" : ""}<small class="hint" title="전년도 실적">${p.year - 1} 실적 ${p.priorActual == null ? "—" : number(p.priorActual) + " " + esc(p.unit)}</small><br>${p.year} 목표 ${number(p.target)} / 실적 ${number(p.actual)} ${esc(p.unit)}</td><td>${pct(p.actual,p.target)}</td><td><span class="status ${status(p)}">${labels[status(p)]}</span><br><small class="hint">운영 상태: ${completionLabels[completionStatus(p)]}</small></td><td class="hint">${operationDetails(p)}</td><td>${(p.teachers ?? []).map(t => esc(t.name) + " <small class=hint>(" + esc(teacherLabel(t.type)) + (t.affiliation ? " · " + esc(t.affiliation) : "") + ")</small>").join("<br>") || "—"}</td></tr>`
+    `<tr><td><button class="edit" type="button" data-edit="${esc(p.id)}">${esc(p.name)}</button><br><small class="hint">${p.year}${p.owner ? " · " + esc(p.owner) : ""}${p.local ? " · 로컬" : ""}</small>${view === "programs" && !shared && !window.ctlSheetActive ? `<br><button type="button" class="edit hint" data-program-operations="${esc(p.id)}">운영 기록 열기</button>` : ""}</td><td>${esc(p.part || "미분류")}</td><td>${esc(p.lead || "미분류")}${p.org ? "<br><small class=hint>" + esc(p.org) + "</small>" : ""}</td><td>${esc(p.fund)}</td><td>${won(p.budget)}</td><td>${won(p.spent)}<br><small class="hint">잔액 ${won(p.budget - p.spent)}</small>${p.expenses?.length ? "<br><small class=hint>세부 " + p.expenses.length + "건</small>" : ""}</td><td>${pct(p.spent,p.budget)}</td><td>${p.indicator ? "<b>" + esc(p.indicator) + "</b><br>" : ""}<small class="hint" title="전년도 실적">${p.year - 1} 실적 ${p.priorActual == null ? "—" : number(p.priorActual) + " " + esc(p.unit)}</small><br>${p.year} 목표 ${number(p.target)} / 실적 ${number(p.actual)} ${esc(p.unit)}</td><td>${pct(p.actual,p.target)}</td><td><span class="status ${status(p)}">${labels[status(p)]}</span><br><small class="hint">운영 상태: ${completionLabels[completionStatus(p)]}</small></td><td class="hint">${operationDetails(p)}</td><td>${(p.teachers ?? []).map(t => esc(t.name) + " <small class=hint>(" + esc(teacherLabel(t.type)) + (t.affiliation ? " · " + esc(t.affiliation) : "") + ")</small>").join("<br>") || "—"}</td></tr>`
   ).join("") || '<tr><td colspan="12">조건에 맞는 프로그램이 없습니다.</td></tr>';
   $("fundRows").innerHTML = groups(fundingPrograms()).map(g =>
     `<tr><td><button class="edit" data-fund="${esc(g.fund)}">${esc(g.fund)}</button></td><td>${g.items.length}개</td><td>${won(g.budget)}</td><td>${won(g.spent)}</td><td>${won(g.budget-g.spent)}</td><td>${pct(g.spent,g.budget)}</td><td>${g.reached} / ${g.tracked}개</td></tr>`
@@ -211,8 +213,6 @@ function setView(next) {
   $("dashboardDetails").hidden = $("stats").hidden = $("overview").hidden = next !== "dashboard";
   $("programPanel").hidden = !["dashboard", "programs"].includes(next);
   $("operationPanel").hidden = next !== "operations";
-  $("add").hidden = next === "operations" || !!window.ctlSheetActive;
-  $("export").hidden = next === "operations";
   $("fundPanel").hidden = next !== "funding";
   document.querySelectorAll("[data-view]").forEach(b => b.setAttribute("aria-pressed", b.dataset.view === next));
   render();
@@ -390,6 +390,16 @@ document.addEventListener("click", event => {
     setView(button.dataset.view);
   }
   if (button.dataset.edit) openEdit(button.dataset.edit);
+  if (button.dataset.programOperations) {
+    const program = programs.find(item => item.id === button.dataset.programOperations);
+    if (program) {
+      setView("operations");
+      $("operationPart").value = parts.includes(program.part) ? program.part : "";
+      renderOperations();
+      $("operationProgram").value = program.id;
+      renderOperations();
+    }
+  }
   if (button.dataset.fund) {
     $("fund").value = button.dataset.fund;
     $("year").value = $("fundYear").value;
